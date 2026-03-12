@@ -547,13 +547,19 @@ export default function App() {
               <Typography
                 sx={{ mt: 3, fontSize: "0.75rem", color: "text.secondary" }}
               >
-Bird data from{" "}
-                <a href="https://ebird.org" target="_blank" rel="noopener noreferrer">
-                  eBird
-                </a>
-                {" "}&middot; Made by{" "}
+                Made by{" "}
                 <a href="https://rwell.org" target="_blank" rel="noopener noreferrer">
                   Corey Farwell
+                </a>
+              </Typography>
+              <Typography
+                sx={{ mt: 1, fontSize: "0.6rem", color: "text.disabled", fontStyle: "italic", lineHeight: 1.4, maxWidth: 440, mx: "auto" }}
+              >
+                Fink, D. et al. 2024. eBird Status and Trends, Data Version:
+                2023; Released: 2025. Cornell Lab of Ornithology, Ithaca, New
+                York.{" "}
+                <a href="https://doi.org/10.2173/WZTW8903" target="_blank" rel="noopener noreferrer">
+                  DOI
                 </a>
               </Typography>
             </Paper>
