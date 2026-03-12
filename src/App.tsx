@@ -11,6 +11,7 @@ import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
+import Tooltip from "@mui/material/Tooltip";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
 import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
@@ -398,18 +399,20 @@ export default function App() {
           </Typography>
           {gamePhase === "playing" && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Typography
-                variant="body2"
-                sx={{
-                  bgcolor: "rgba(255,255,255,0.15)",
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 1.5,
-                  fontSize: "0.85rem",
-                }}
-              >
-                {DIFFICULTY[difficulty].label}
-              </Typography>
+              <Tooltip title={DIFFICULTY_DESCRIPTIONS[difficulty]} arrow>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 1.5,
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  {DIFFICULTY[difficulty].label}
+                </Typography>
+              </Tooltip>
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
                 Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
                 <AnimatedCounter value={totalScore} />
@@ -824,13 +827,15 @@ export default function App() {
             <Typography
               sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1.5 }}
             >
-              <a
-                href={`https://science.ebird.org/en/status-and-trends/species/${currentBird?.speciesCode}/range-map`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View range on eBird
-              </a>
+              <Tooltip title="See this bird's full range map on eBird" arrow>
+                <a
+                  href={`https://science.ebird.org/en/status-and-trends/species/${currentBird?.speciesCode}/range-map`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View range on eBird
+                </a>
+              </Tooltip>
             </Typography>
             <Button
               variant="contained"
