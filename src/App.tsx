@@ -80,6 +80,7 @@ export default function App() {
   } | null>(null);
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [calculating, setCalculating] = useState(false);
+  const [birdsLoaded, setBirdsLoaded] = useState(false);
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -351,6 +352,7 @@ export default function App() {
     fetchBirds().then((data) => {
       allBirdsRef.current = data;
       birdsLoadedRef.current = true;
+      setBirdsLoaded(true);
     });
   }, []);
 
@@ -540,9 +542,10 @@ export default function App() {
                 color="secondary"
                 size="large"
                 onClick={handleStartGame}
+                disabled={!birdsLoaded}
                 sx={{ px: 5, borderRadius: 2, fontWeight: 600 }}
               >
-                Start Game
+                {birdsLoaded ? "Start Game" : "Loading..."}
               </Button>
 
               <Typography
