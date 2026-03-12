@@ -414,6 +414,20 @@ export default function App() {
                 Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
                 <AnimatedCounter value={totalScore} />
               </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handlePlayAgain}
+                sx={{
+                  color: "white",
+                  borderColor: "rgba(255,255,255,0.4)",
+                  textTransform: "none",
+                  fontSize: "0.8rem",
+                  "&:hover": { borderColor: "white", bgcolor: "rgba(255,255,255,0.1)" },
+                }}
+              >
+                Quit
+              </Button>
             </Box>
           )}
         </Toolbar>
