@@ -827,6 +827,17 @@ export default function App() {
             >
               <AnimatedCounter value={result.points} prefix="+" suffix=" points" />
             </Typography>
+            <Typography
+              sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1.5 }}
+            >
+              <a
+                href={`https://science.ebird.org/en/status-and-trends/species/${currentBird?.speciesCode}/range-map`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View range on eBird
+              </a>
+            </Typography>
             <Button
               variant="contained"
               color="secondary"
