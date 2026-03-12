@@ -16,6 +16,7 @@ import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
 import GeoWorker from "./geo.worker?worker";
 import type { Bird, DifficultyKey, GamePhase, RoundResult } from "./types";
+import AnimatedCounter from "./AnimatedCounter";
 
 const TOTAL_ROUNDS = 10;
 
@@ -409,7 +410,7 @@ export default function App() {
               </Typography>
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
                 Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
-                {totalScore.toLocaleString()}
+                <AnimatedCounter value={totalScore} />
               </Typography>
             </Box>
           )}
@@ -801,7 +802,7 @@ export default function App() {
             <Typography
               sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}
             >
-              +{result.points.toLocaleString()} points
+              <AnimatedCounter value={result.points} prefix="+" suffix=" points" />
             </Typography>
             <Button
               variant="contained"
