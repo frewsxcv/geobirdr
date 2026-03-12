@@ -11,6 +11,8 @@ import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
+import Slide from "@mui/material/Slide";
+import Grow from "@mui/material/Grow";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
 import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
@@ -704,7 +706,7 @@ export default function App() {
         )}
 
         {/* Bird Photo */}
-        {gamePhase === "playing" && photo && (
+        <Grow in={gamePhase === "playing" && !!photo}>
           <Card
             sx={{
               position: "absolute",
@@ -718,7 +720,7 @@ export default function App() {
           >
             <CardMedia
               component="img"
-              image={photo.url}
+              image={photo?.url ?? ""}
               alt={currentBird?.name ?? ""}
               sx={{ width: 160, height: 160, objectFit: "cover" }}
             />
@@ -735,10 +737,10 @@ export default function App() {
                 whiteSpace: "nowrap",
               }}
             >
-              &copy; {photo.attribution}
+              {photo && <>&copy; {photo.attribution}</>}
             </Typography>
           </Card>
-        )}
+        </Grow>
 
         {/* Calculating Spinner */}
         {gamePhase === "playing" && calculating && !result && (
@@ -767,91 +769,92 @@ export default function App() {
         )}
 
         {/* Result Panel */}
-        {gamePhase === "playing" && result && (
-          <Paper
-            elevation={6}
-            sx={{
-              position: "absolute",
-              bottom: 30,
-              left: "50%",
-              transform: "translateX(-50%)",
-              borderRadius: 3,
-              px: 3.5,
-              py: 2.5,
-              zIndex: 1000,
-              textAlign: "center",
-              minWidth: 280,
-            }}
-          >
-            {result.distanceKm === 0 ? (
-              <>
-                <Typography
-                  sx={{ color: "secondary.main", fontWeight: 600 }}
-                >
-                  Inside the range!
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: "1.8rem",
-                    fontWeight: 700,
-                    color: "primary.main",
-                    my: 0.75,
-                  }}
-                >
-                  0 km
-                </Typography>
-              </>
-            ) : (
-              <>
-                <Typography>Distance to range:</Typography>
-                <Typography
-                  sx={{
-                    fontSize: "1.8rem",
-                    fontWeight: 700,
-                    color: "primary.main",
-                    my: 0.75,
-                  }}
-                >
-                  {Math.round(result.distanceKm).toLocaleString()} km
-                </Typography>
-              </>
-            )}
-            <Typography
-              sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}
+        <Slide direction="up" in={gamePhase === "playing" && !!result} mountOnEnter unmountOnExit>
+          <Box sx={{ position: "absolute", bottom: 30, left: "50%", transform: "translateX(-50%)", zIndex: 1000 }}>
+            <Paper
+              elevation={6}
+              sx={{
+                borderRadius: 3,
+                px: 3.5,
+                py: 2.5,
+                textAlign: "center",
+                minWidth: 280,
+              }}
             >
-              <AnimatedCounter value={result.points} prefix="+" suffix=" points" />
-            </Typography>
-            <Typography
-              sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1.5 }}
-            >
-              <a
-                href={`https://science.ebird.org/en/status-and-trends/species/${currentBird?.speciesCode}/range-map`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View range on eBird
-              </a>
-            </Typography>
-            <Button
-              variant="contained"
-              color="secondary"
-              onClick={advanceToNextBird}
-              disabled={!nextReady}
-              sx={{ px: 3.5, borderRadius: 2 }}
-              startIcon={
-                !nextReady ? (
-                  <CircularProgress size={18} color="inherit" />
-                ) : undefined
-              }
-            >
-              {!nextReady
-                ? "Loading..."
-                : isLastRound
-                  ? "Finish"
-                  : "Next Bird"}
-            </Button>
-          </Paper>
-        )}
+              {result && (
+                <>
+                  {result.distanceKm === 0 ? (
+                    <>
+                      <Typography
+                        sx={{ color: "secondary.main", fontWeight: 600 }}
+                      >
+                        Inside the range!
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 700,
+                          color: "primary.main",
+                          my: 0.75,
+                        }}
+                      >
+                        0 km
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <Typography>Distance to range:</Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 700,
+                          color: "primary.main",
+                          my: 0.75,
+                        }}
+                      >
+                        {Math.round(result.distanceKm).toLocaleString()} km
+                      </Typography>
+                    </>
+                  )}
+                  <Typography
+                    sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}
+                  >
+                    <AnimatedCounter value={result.points} prefix="+" suffix=" points" />
+                  </Typography>
+                  <Typography
+                    sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1.5 }}
+                  >
+                    <a
+                      href={`https://science.ebird.org/en/status-and-trends/species/${currentBird?.speciesCode}/range-map`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View range on eBird
+                    </a>
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={advanceToNextBird}
+                    disabled={!nextReady}
+                    sx={{ px: 3.5, borderRadius: 2 }}
+                    startIcon={
+                      !nextReady ? (
+                        <CircularProgress size={18} color="inherit" />
+                      ) : undefined
+                    }
+                  >
+                    {!nextReady
+                      ? "Loading..."
+                      : isLastRound
+                        ? "Finish"
+                        : "Next Bird"}
+                  </Button>
+                </>
+              )}
+            </Paper>
+          </Box>
+        </Slide>
       </Box>
     </Box>
   );
