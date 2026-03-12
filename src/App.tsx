@@ -9,6 +9,7 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Backdrop from "@mui/material/Backdrop";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -583,6 +584,19 @@ export default function App() {
             </Paper>
           </Box>
         )}
+
+        <Backdrop
+          open={gamePhase === "start" && !birdsLoaded}
+          sx={{
+            zIndex: 1200,
+            color: "#fff",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <CircularProgress color="inherit" />
+          <Typography color="inherit">Loading bird data...</Typography>
+        </Backdrop>
 
         {/* Game Over Overlay */}
         {gamePhase === "finished" && (
