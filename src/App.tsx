@@ -9,6 +9,7 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import MobileStepper from "@mui/material/MobileStepper";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -410,10 +411,25 @@ export default function App() {
               >
                 {DIFFICULTY[difficulty].label}
               </Typography>
-              <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
-                <AnimatedCounter value={totalScore} />
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <MobileStepper
+                  variant="dots"
+                  steps={TOTAL_ROUNDS}
+                  position="static"
+                  activeStep={roundNum - 1}
+                  sx={{
+                    bgcolor: "transparent",
+                    p: 0,
+                    "& .MuiMobileStepper-dot": { bgcolor: "rgba(255,255,255,0.3)", mx: 0.25 },
+                    "& .MuiMobileStepper-dotActive": { bgcolor: "white" },
+                  }}
+                  backButton={null}
+                  nextButton={null}
+                />
+                <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                  Score: <AnimatedCounter value={totalScore} />
+                </Typography>
+              </Box>
               <Button
                 variant="outlined"
                 size="small"
