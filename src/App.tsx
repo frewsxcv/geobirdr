@@ -543,6 +543,20 @@ export default function App() {
               >
                 Start Game
               </Button>
+
+              <Typography
+                sx={{ mt: 3, fontSize: "0.75rem", color: "text.secondary" }}
+              >
+Bird data from{" "}
+                <a href="https://ebird.org" target="_blank" rel="noopener noreferrer">
+                  eBird
+                </a>
+                {" "}&middot;{" "}
+                &copy;{" "}
+                <a href="https://rwell.org" target="_blank" rel="noopener noreferrer">
+                  Corey Farwell
+                </a>
+              </Typography>
             </Paper>
           </Box>
         )}
@@ -698,7 +712,7 @@ export default function App() {
                 whiteSpace: "nowrap",
               }}
             >
-              {photo.attribution}
+              &copy; {photo.attribution}
             </Typography>
           </Card>
         )}
