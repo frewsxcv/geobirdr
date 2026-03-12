@@ -5,16 +5,19 @@ Downloads the iNaturalist bird geopackage files, extracts taxon IDs and
 scientific names, then looks up common names via the iNaturalist API.
 Outputs birds.json with all birds that have range maps available.
 
-Requirements: pip install fiona
+Requirements: pip install fiona shapely pyproj
 """
 
 import fiona
 import json
+import math
 import sys
 import tempfile
 import time
 import urllib.parse
 import urllib.request
+from pyproj import Geod
+from shapely.geometry import shape
 
 GPKG_BASE = "https://inaturalist-open-data.s3.us-east-1.amazonaws.com/geomodel/geopackages/latest"
 METADATA_URL = f"{GPKG_BASE}/metadata.json"
@@ -53,8 +56,18 @@ def download_file(url, path):
         print(file=sys.stderr)
 
 
+geod = Geod(ellps="WGS84")
+
+
+def calc_area_km2(geometry):
+    """Calculate geodesic area of a geometry in km²."""
+    shp = shape(geometry)
+    area_m2 = abs(geod.geometry_area_perimeter(shp)[0])
+    return round(area_m2 / 1e6)
+
+
 def extract_taxa_from_gpkg(path):
-    """Extract taxon_id and scientific name from a geopackage (ignoring geometry)."""
+    """Extract taxon_id, scientific name, and range area from a geopackage."""
     taxa = {}
     with fiona.open(path) as src:
         for feature in src:
@@ -62,7 +75,8 @@ def extract_taxa_from_gpkg(path):
             taxon_id = props.get("taxon_id")
             name = props.get("name", "")
             if taxon_id:
-                taxa[taxon_id] = name
+                area_km2 = calc_area_km2(feature["geometry"])
+                taxa[taxon_id] = {"name": name, "areaKm2": area_km2}
     return taxa
 
 
@@ -123,13 +137,14 @@ def main():
 
     # Build output — only include birds with common names
     results = []
-    for taxon_id, scientific_name in sorted(all_taxa.items()):
+    for taxon_id, info in sorted(all_taxa.items()):
         common_name = common_names.get(taxon_id)
         if common_name:
             results.append({
                 "name": common_name,
-                "scientificName": scientific_name,
+                "scientificName": info["name"],
                 "taxonId": taxon_id,
+                "areaKm2": info["areaKm2"],
             })
 
     results.sort(key=lambda x: x["name"])
