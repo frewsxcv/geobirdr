@@ -9,6 +9,7 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Skeleton from "@mui/material/Skeleton";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -704,7 +705,7 @@ export default function App() {
         )}
 
         {/* Bird Photo */}
-        {gamePhase === "playing" && photo && (
+        {gamePhase === "playing" && (
           <Card
             sx={{
               position: "absolute",
@@ -716,12 +717,16 @@ export default function App() {
               boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
             }}
           >
-            <CardMedia
-              component="img"
-              image={photo.url}
-              alt={currentBird?.name ?? ""}
-              sx={{ width: 160, height: 160, objectFit: "cover" }}
-            />
+            {photo ? (
+              <CardMedia
+                component="img"
+                image={photo.url}
+                alt={currentBird?.name ?? ""}
+                sx={{ width: 160, height: 160, objectFit: "cover" }}
+              />
+            ) : (
+              <Skeleton variant="rectangular" width={160} height={160} animation="wave" />
+            )}
             <Typography
               variant="caption"
               sx={{
@@ -735,7 +740,7 @@ export default function App() {
                 whiteSpace: "nowrap",
               }}
             >
-              &copy; {photo.attribution}
+              {photo ? <>&copy; {photo.attribution}</> : <Skeleton width="80%" />}
             </Typography>
           </Card>
         )}
