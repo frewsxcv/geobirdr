@@ -16,6 +16,7 @@ import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
 import GeoWorker from "./geo.worker?worker";
 import type { Bird, DifficultyKey, GamePhase, RoundResult } from "./types";
+import Avatar from "@mui/material/Avatar";
 import AnimatedCounter from "./AnimatedCounter";
 
 const TOTAL_ROUNDS = 10;
@@ -671,9 +672,21 @@ export default function App() {
                       bgcolor: i % 2 === 0 ? "action.hover" : "transparent",
                     }}
                   >
-                    <Typography sx={{ fontSize: "0.85rem" }}>
-                      <strong>R{i + 1}</strong>&ensp;{r.birdName}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <Avatar
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          fontSize: "0.75rem",
+                          bgcolor: "primary.main",
+                        }}
+                      >
+                        {i + 1}
+                      </Avatar>
+                      <Typography sx={{ fontSize: "0.85rem" }}>
+                        {r.birdName}
+                      </Typography>
+                    </Box>
                     <Box sx={{ textAlign: "right" }}>
                       <Typography sx={{ fontSize: "0.85rem", fontWeight: 600 }}>
                         {r.points.toLocaleString()} pts
