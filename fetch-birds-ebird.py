@@ -11,6 +11,7 @@ Usage: EBIRD_ST_KEY=your_key python3 fetch-birds-ebird.py > birds.json
 import fiona
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -74,14 +75,32 @@ def download_range_gpkg(species_code):
         return None
 
 
-def calc_total_area_km2(gpkg_path):
-    """Calculate total range area across all seasons in km²."""
-    total = 0
+def process_range(gpkg_path, species_code, ranges_dir):
+    """Calculate area and write GeoJSON. Returns area in km²."""
+    from shapely.geometry import mapping
+
+    features = []
+    total_area = 0
     with fiona.open(gpkg_path) as src:
-        for feature in src:
-            shp = shape(feature["geometry"])
-            total += abs(geod.geometry_area_perimeter(shp)[0])
-    return round(total / 1e6)
+        for f in src:
+            shp = shape(f["geometry"])
+            total_area += abs(geod.geometry_area_perimeter(shp)[0])
+            features.append({
+                "type": "Feature",
+                "properties": {"season": f["properties"]["season"]},
+                "geometry": mapping(shp),
+            })
+
+    # Write GeoJSON with reduced precision (~11m accuracy)
+    geojson = {"type": "FeatureCollection", "features": features}
+    text = json.dumps(geojson)
+    text = re.sub(r"(\d+\.\d{4})\d+", r"\1", text)
+
+    os.makedirs(ranges_dir, exist_ok=True)
+    with open(os.path.join(ranges_dir, f"{species_code}.geojson"), "w") as f:
+        f.write(text)
+
+    return round(total_area / 1e6)
 
 
 def main():
@@ -110,8 +129,9 @@ def main():
 
     print(f"\n  Found {len(species_with_ranges)} species with range data", file=sys.stderr)
 
-    # Step 3: Download ranges and compute areas
-    print(f"Downloading ranges...", file=sys.stderr)
+    # Step 3: Download ranges, convert to GeoJSON, and compute areas
+    ranges_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ranges")
+    print(f"Downloading ranges to {ranges_dir}...", file=sys.stderr)
     results = []
 
     for i, code in enumerate(species_with_ranges):
@@ -120,7 +140,7 @@ def main():
 
         if gpkg_path:
             try:
-                area = calc_total_area_km2(gpkg_path)
+                area = process_range(gpkg_path, code, ranges_dir)
                 results.append({
                     "name": info["name"],
                     "scientificName": info["scientificName"],
