@@ -2,6 +2,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import * as turf from "@turf/turf";
 import type { FeatureCollection } from "geojson";
+import AppBar from "@mui/material/AppBar";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Button from "@mui/material/Button";
+import Backdrop from "@mui/material/Backdrop";
+import CircularProgress from "@mui/material/CircularProgress";
+import Card from "@mui/material/Card";
+import CardMedia from "@mui/material/CardMedia";
+import type { SelectChangeEvent } from "@mui/material/Select";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
 import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import { calcDistanceToRange, findNearestPointOnRange } from "./geo";
@@ -27,7 +40,10 @@ export default function App() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("easy");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RoundResult | null>(null);
-  const [photo, setPhoto] = useState<{ url: string; attribution: string } | null>(null);
+  const [photo, setPhoto] = useState<{
+    url: string;
+    attribution: string;
+  } | null>(null);
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -52,10 +68,22 @@ export default function App() {
     const map = mapRef.current;
     const layers = layersRef.current;
     if (!map) return;
-    if (layers.guess) { map.removeLayer(layers.guess); layers.guess = null; }
-    if (layers.range) { map.removeLayer(layers.range); layers.range = null; }
-    if (layers.line) { map.removeLayer(layers.line); layers.line = null; }
-    if (layers.nearest) { map.removeLayer(layers.nearest); layers.nearest = null; }
+    if (layers.guess) {
+      map.removeLayer(layers.guess);
+      layers.guess = null;
+    }
+    if (layers.range) {
+      map.removeLayer(layers.range);
+      layers.range = null;
+    }
+    if (layers.line) {
+      map.removeLayer(layers.line);
+      layers.line = null;
+    }
+    if (layers.nearest) {
+      map.removeLayer(layers.nearest);
+      layers.nearest = null;
+    }
   }, []);
 
   const startRound = useCallback(() => {
@@ -94,7 +122,9 @@ export default function App() {
       setLoading(true);
 
       try {
-        const geojson: FeatureCollection = await fetchRange(currentBird.speciesCode);
+        const geojson: FeatureCollection = await fetchRange(
+          currentBird.speciesCode
+        );
         setLoading(false);
 
         layers.range = L.geoJSON(geojson, {
@@ -174,7 +204,6 @@ export default function App() {
       birdsRef.current = data.filter(
         (b) => b.areaKm2 >= diff.min && b.areaKm2 < diff.max
       );
-      // Start first round
       const used = usedBirdsRef.current;
       const birds = birdsRef.current;
       if (used.size >= birds.length) used.clear();
@@ -196,7 +225,9 @@ export default function App() {
     if (!map) return;
     const handler = (e: L.LeafletMouseEvent) => handleGuess(e.latlng);
     map.on("click", handler);
-    return () => { map.off("click", handler); };
+    return () => {
+      map.off("click", handler);
+    };
   }, [handleGuess]);
 
   const handleNextBird = () => {
@@ -204,7 +235,8 @@ export default function App() {
     startRound();
   };
 
-  const handleDifficultyChange = (key: DifficultyKey) => {
+  const handleDifficultyChange = (e: SelectChangeEvent) => {
+    const key = e.target.value as DifficultyKey;
     setDifficulty(key);
     filterBirds(key);
     setTotalScore(0);
@@ -224,81 +256,192 @@ export default function App() {
   };
 
   return (
-    <>
-      <div className="header">
-        <h1>GeoBirdr</h1>
-        <div className="header-right">
-          <select
-            className="difficulty-select"
-            value={difficulty}
-            onChange={(e) =>
-              handleDifficultyChange(e.target.value as DifficultyKey)
-            }
-          >
-            <option value="all">All Birds</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-            <option value="expert">Expert</option>
-          </select>
-          <div className="score-display">
-            Round: {roundNum} &nbsp;|&nbsp; Score:{" "}
-            {totalScore.toLocaleString()}
-          </div>
-        </div>
-      </div>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* Header */}
+      <AppBar position="static" sx={{ bgcolor: "primary.main", zIndex: 1000 }}>
+        <Toolbar sx={{ justifyContent: "space-between" }}>
+          <Typography variant="h6" sx={{ letterSpacing: 1 }}>
+            GeoBirdr
+          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Select
+              value={difficulty}
+              onChange={handleDifficultyChange}
+              size="small"
+              sx={{
+                color: "white",
+                fontSize: "0.85rem",
+                bgcolor: "rgba(255,255,255,0.15)",
+                border: "1px solid rgba(255,255,255,0.3)",
+                borderRadius: 1.5,
+                "& .MuiSelect-icon": { color: "white" },
+                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
+              }}
+            >
+              <MenuItem value="all">All Birds</MenuItem>
+              <MenuItem value="easy">Easy</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="hard">Hard</MenuItem>
+              <MenuItem value="expert">Expert</MenuItem>
+            </Select>
+            <Typography variant="body1" sx={{ opacity: 0.9 }}>
+              Round: {roundNum} &nbsp;|&nbsp; Score:{" "}
+              {totalScore.toLocaleString()}
+            </Typography>
+          </Box>
+        </Toolbar>
+      </AppBar>
 
-      <div className="bird-banner">
-        <span>
-          Where does the <strong>{currentBird?.name ?? "..."}</strong>{" "}
+      {/* Bird Banner */}
+      <Box
+        sx={{
+          bgcolor: "secondary.main",
+          color: "white",
+          textAlign: "center",
+          py: 1.25,
+          px: 2.5,
+          fontSize: "1.2rem",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 1.5,
+        }}
+      >
+        <Typography component="span" fontSize="inherit">
+          Where does the{" "}
+          <strong>{currentBird?.name ?? "..."}</strong>{" "}
           {currentBird?.scientificName && (
             <em>({currentBird.scientificName})</em>
           )}{" "}
           live?
-        </span>
-        <span className="instruction">Click on the map to guess</span>
-      </div>
+        </Typography>
+        <Typography
+          component="span"
+          sx={{ fontSize: "0.85rem", opacity: 0.8 }}
+        >
+          Click on the map to guess
+        </Typography>
+      </Box>
 
-      <div className="map-container">
-        <div className="map" ref={mapElRef} />
+      {/* Map Container */}
+      <Box sx={{ position: "relative", flex: 1, display: "flex", flexDirection: "column" }}>
+        <Box ref={mapElRef} sx={{ flex: 1 }} />
 
+        {/* Bird Photo */}
         {photo && (
-          <div className="bird-photo">
-            <img src={photo.url} alt={currentBird?.name ?? ""} />
-            <div className="attribution">{photo.attribution}</div>
-          </div>
+          <Card
+            sx={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              zIndex: 1000,
+              width: 160,
+              borderRadius: 2,
+              boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
+            }}
+          >
+            <CardMedia
+              component="img"
+              image={photo.url}
+              alt={currentBird?.name ?? ""}
+              sx={{ width: 160, height: 160, objectFit: "cover" }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                display: "block",
+                px: 0.75,
+                py: 0.5,
+                fontSize: "0.6rem",
+                color: "text.secondary",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {photo.attribution}
+            </Typography>
+          </Card>
         )}
 
-        {loading && (
-          <div className="loading-overlay">
-            <div className="spinner">Fetching range data...</div>
-          </div>
-        )}
+        {/* Loading Overlay */}
+        <Backdrop
+          open={loading}
+          sx={{ position: "absolute", zIndex: 999, bgcolor: "rgba(0,0,0,0.3)" }}
+        >
+          <Paper sx={{ px: 3.75, py: 2.5, borderRadius: 3 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <CircularProgress size={24} color="secondary" />
+              <Typography variant="body1">Fetching range data...</Typography>
+            </Box>
+          </Paper>
+        </Backdrop>
 
+        {/* Result Panel */}
         {result && (
-          <div className="result-panel">
+          <Paper
+            elevation={6}
+            sx={{
+              position: "absolute",
+              bottom: 30,
+              left: "50%",
+              transform: "translateX(-50%)",
+              borderRadius: 3,
+              px: 3.5,
+              py: 2.5,
+              zIndex: 1000,
+              textAlign: "center",
+              minWidth: 280,
+            }}
+          >
             {result.distanceKm === 0 ? (
               <>
-                <div className="perfect">Inside the range!</div>
-                <div className="distance">0 km</div>
+                <Typography
+                  sx={{ color: "secondary.main", fontWeight: 600 }}
+                >
+                  Inside the range!
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "1.8rem",
+                    fontWeight: 700,
+                    color: "primary.main",
+                    my: 0.75,
+                  }}
+                >
+                  0 km
+                </Typography>
               </>
             ) : (
               <>
-                <div>Distance to range:</div>
-                <div className="distance">
+                <Typography>Distance to range:</Typography>
+                <Typography
+                  sx={{
+                    fontSize: "1.8rem",
+                    fontWeight: 700,
+                    color: "primary.main",
+                    my: 0.75,
+                  }}
+                >
                   {Math.round(result.distanceKm).toLocaleString()} km
-                </div>
+                </Typography>
               </>
             )}
-            <div className="points">
+            <Typography sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}>
               +{result.points.toLocaleString()} points
-            </div>
-            <button className="next-btn" onClick={handleNextBird}>
+            </Typography>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleNextBird}
+              sx={{ px: 3.5, borderRadius: 2 }}
+            >
               Next Bird
-            </button>
-          </div>
+            </Button>
+          </Paper>
         )}
-      </div>
-    </>
+      </Box>
+    </Box>
   );
 }
