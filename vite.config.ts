@@ -7,9 +7,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/geobirdr': {
+      '/api-gcs': {
         target: 'https://storage.googleapis.com',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-gcs/, ''),
       },
     },
   },

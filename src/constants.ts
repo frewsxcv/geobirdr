@@ -1,7 +1,7 @@
 import type { DifficultyConfig, DifficultyKey } from "./types";
 
 export const GCS_BASE = import.meta.env.DEV
-  ? "/geobirdr"
+  ? "/api-gcs/geobirdr"
   : "https://storage.googleapis.com/geobirdr";
 export const RANGES_URL = `${GCS_BASE}/ranges`;
 export const TAXA_API = "https://api.inaturalist.org/v1/taxa";
