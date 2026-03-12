@@ -34,10 +34,10 @@ const SOURCE_IDS = {
 } as const;
 
 const DIFFICULTY_DESCRIPTIONS: Record<DifficultyKey, string> = {
-  easy: "Large ranges \u2014 great for beginners",
-  medium: "Mid-sized ranges \u2014 a fair challenge",
-  hard: "Small ranges \u2014 for bird enthusiasts",
-  expert: "Tiny ranges \u2014 only for the bold",
+  easy: "Well-known birds \u2014 great for beginners",
+  medium: "Familiar birds \u2014 a fair challenge",
+  hard: "Obscure birds \u2014 for bird enthusiasts",
+  expert: "Rare birds \u2014 only for the bold",
   all: "Anything goes",
 };
 
@@ -84,7 +84,7 @@ export default function App() {
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
     birdsRef.current = allBirdsRef.current.filter(
-      (b) => b.areaKm2 >= diff.min && b.areaKm2 < diff.max
+      (b) => b.observationCount >= diff.min && b.observationCount < diff.max
     );
   }, []);
 

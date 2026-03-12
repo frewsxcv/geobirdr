@@ -3,6 +3,7 @@ export interface Bird {
   scientificName: string;
   speciesCode: string;
   areaKm2: number;
+  observationCount: number;
 }
 
 export interface DifficultyConfig {
