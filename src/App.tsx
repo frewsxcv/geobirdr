@@ -9,6 +9,8 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -516,25 +518,30 @@ export default function App() {
                 Choose Difficulty
               </Typography>
 
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 3 }}>
+              <ToggleButtonGroup
+                value={difficulty}
+                exclusive
+                onChange={(_e, val) => { if (val !== null) setDifficulty(val); }}
+                orientation="vertical"
+                fullWidth
+                sx={{ mb: 3 }}
+              >
                 {(
                   ["easy", "medium", "hard", "expert", "all"] as DifficultyKey[]
                 ).map((key) => (
-                  <Button
+                  <ToggleButton
                     key={key}
-                    variant={difficulty === key ? "contained" : "outlined"}
-                    color={difficulty === key ? "primary" : "inherit"}
-                    onClick={() => setDifficulty(key)}
+                    value={key}
                     sx={{
                       justifyContent: "flex-start",
                       textTransform: "none",
                       py: 1.25,
                       px: 2.5,
-                      borderRadius: 2,
-                      border:
-                        difficulty === key
-                          ? undefined
-                          : "1px solid rgba(0,0,0,0.15)",
+                      "&.Mui-selected": {
+                        bgcolor: "primary.main",
+                        color: "white",
+                        "&:hover": { bgcolor: "primary.dark" },
+                      },
                     }}
                   >
                     <Box sx={{ textAlign: "left" }}>
@@ -547,9 +554,9 @@ export default function App() {
                         {DIFFICULTY_DESCRIPTIONS[key]}
                       </Typography>
                     </Box>
-                  </Button>
+                  </ToggleButton>
                 ))}
-              </Box>
+              </ToggleButtonGroup>
 
               <Button
                 variant="contained"
