@@ -174,7 +174,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
   <script>
-    const RANGES_URL = "ranges";
+    const GCS_BASE = "https://storage.googleapis.com/geobirdr";
+    const RANGES_URL = `${GCS_BASE}/ranges`;
     const TAXA_API = "https://api.inaturalist.org/v1/taxa";
     const MAX_POINTS = 5000;
 
@@ -211,7 +212,7 @@
     }).addTo(map);
 
     // Load birds
-    fetch("birds-ebird.json")
+    fetch(`${GCS_BASE}/birds-ebird.json`)
       .then(r => r.json())
       .then(data => {
         allBirds = data;
