@@ -174,8 +174,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
   <script>
-    const GEOMODEL_URL = "https://inaturalist-open-data.s3.us-east-1.amazonaws.com/geomodel/geojsons/latest";
-    const CURATED_RANGE_URL = "https://www.inaturalist.org/attachments/taxon_ranges";
+    const GCS_BASE = "https://storage.googleapis.com/geobirdr";
+    const RANGES_URL = `${GCS_BASE}/ranges`;
     const TAXA_API = "https://api.inaturalist.org/v1/taxa";
     const MAX_POINTS = 5000;
 
@@ -212,7 +212,7 @@
     }).addTo(map);
 
     // Load birds
-    fetch("birds.json")
+    fetch(`${GCS_BASE}/birds-ebird.json`)
       .then(r => r.json())
       .then(data => {
         allBirds = data;
@@ -250,17 +250,17 @@
       document.getElementById("round-num").textContent = roundNum;
       guessAllowed = true;
       map.setView([20, 0], 2);
-      fetchBirdPhoto(currentBird.taxonId);
+      fetchBirdPhoto(currentBird.scientificName);
     }
 
-    async function fetchBirdPhoto(taxonId) {
+    async function fetchBirdPhoto(scientificName) {
       const photoEl = document.getElementById("bird-photo");
       const imgEl = document.getElementById("bird-photo-img");
       const attrEl = document.getElementById("bird-photo-attr");
       photoEl.classList.add("hidden");
 
       try {
-        const resp = await fetch(`${TAXA_API}/${taxonId}`);
+        const resp = await fetch(`${TAXA_API}?q=${encodeURIComponent(scientificName)}&rank=species&per_page=1`);
         if (!resp.ok) return;
         const data = await resp.json();
         const photo = data.results?.[0]?.default_photo;
@@ -276,50 +276,10 @@
       } catch { /* photo is non-essential */ }
     }
 
-    function kmlToGeoJSON(kmlText) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(kmlText, "text/xml");
-      const polygons = doc.querySelectorAll("Polygon");
-      const features = [];
-
-      for (const polygon of polygons) {
-        const coordsEl = polygon.querySelector("outerBoundaryIs LinearRing coordinates");
-        if (!coordsEl) continue;
-        const coords = coordsEl.textContent.trim().split(/\s+/).map(c => {
-          const [lon, lat] = c.split(",").map(Number);
-          return [lon, lat];
-        });
-        if (coords.length < 3) continue;
-        // Ensure ring is closed
-        if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
-          coords.push([...coords[0]]);
-        }
-        features.push({
-          type: "Feature",
-          properties: {},
-          geometry: { type: "Polygon", coordinates: [coords] }
-        });
-      }
-
-      if (features.length === 0) return null;
-      return { type: "FeatureCollection", features };
-    }
-
-    async function fetchRange(taxonId) {
-      // Try geomodel first (GeoJSON), fall back to curated range (KML)
-      try {
-        const resp = await fetch(`${GEOMODEL_URL}/${taxonId}.geojson`);
-        if (resp.ok) return resp.json();
-      } catch { /* fall through */ }
-
-      const kmlResp = await fetch(`${CURATED_RANGE_URL}/${taxonId}.kml`);
-      if (kmlResp.ok) {
-        const kmlText = await kmlResp.text();
-        const geojson = kmlToGeoJSON(kmlText);
-        if (geojson) return geojson;
-      }
-
-      throw new Error("No range data available");
+    async function fetchRange(speciesCode) {
+      const resp = await fetch(`${RANGES_URL}/${speciesCode}.geojson`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
     }
 
     // Handle guess
@@ -344,7 +304,7 @@
       overlay.style.display = "flex";
 
       try {
-        const geojson = await fetchRange(currentBird.taxonId);
+        const geojson = await fetchRange(currentBird.speciesCode);
 
         overlay.style.display = "none";
 
