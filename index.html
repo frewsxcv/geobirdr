@@ -218,13 +218,19 @@
         const nearest = findNearestPointOnRange(guessPoint, geojson);
 
         if (nearest && distanceKm > 0) {
-          // Draw line from guess to nearest range point
+          // Adjust longitudes so the line crosses the date line
+          // instead of wrapping the long way around
+          let guessLng = guessLatLng.lng;
+          let nearLng = nearest[0];
+          if (nearLng - guessLng > 180) nearLng -= 360;
+          else if (guessLng - nearLng > 180) nearLng += 360;
+
           resultLine = L.polyline(
-            [[guessLatLng.lat, guessLatLng.lng], [nearest[1], nearest[0]]],
+            [[guessLatLng.lat, guessLng], [nearest[1], nearLng]],
             { color: "#e63946", weight: 2, dashArray: "6 4" }
           ).addTo(map);
 
-          nearestMarker = L.circleMarker([nearest[1], nearest[0]], {
+          nearestMarker = L.circleMarker([nearest[1], nearLng], {
             radius: 6, color: "#2d6a4f", fillColor: "#40916c", fillOpacity: 1, weight: 2,
           }).addTo(map);
         }
@@ -266,13 +272,75 @@
       }
     });
 
+    // Shift a geometry's longitudes by an offset (for date line handling)
+    function shiftCoords(coords, offset) {
+      if (typeof coords[0] === "number") return [coords[0] + offset, coords[1]];
+      return coords.map(c => shiftCoords(c, offset));
+    }
+
+    function shiftFeature(feature, offset) {
+      if (offset === 0) return feature;
+      const geom = feature.geometry;
+      return {
+        ...feature,
+        geometry: { ...geom, coordinates: shiftCoords(geom.coordinates, offset) }
+      };
+    }
+
+    // Check if a polygon's longitude span suggests it crosses the date line
+    function crossesDateLine(feature) {
+      const geom = feature.geometry;
+      if (!geom) return false;
+      const coords = geom.coordinates.flat(geom.type === "MultiPolygon" ? 3 : 2);
+      const lons = [];
+      for (let i = 0; i < coords.length; i += 2) lons.push(coords[i]);
+      // Heuristic: not all coords are arrays of [lon,lat] after flat — use turf instead
+      let minLon = Infinity, maxLon = -Infinity;
+      turf.coordEach(feature, (coord) => {
+        if (coord[0] < minLon) minLon = coord[0];
+        if (coord[0] > maxLon) maxLon = coord[0];
+      });
+      return (maxLon - minLon) > 180;
+    }
+
+    // For a given feature, return an array of shifted variants to try.
+    // This handles polygons that cross the date line and guesses on
+    // the other side.
+    function featureVariants(feature, pointLng) {
+      const variants = [feature];
+      // If polygon crosses date line, normalize it to [0, 360] range
+      if (crossesDateLine(feature)) {
+        variants.push(shiftFeature(feature, 360));
+      }
+      // Also try shifting the feature ±360 to handle cases where
+      // the guess and polygon are on opposite sides of the date line
+      variants.push(shiftFeature(feature, 360));
+      variants.push(shiftFeature(feature, -360));
+      return variants;
+    }
+
+    function pointVariants(point) {
+      const [lng, lat] = turf.getCoord(point);
+      return [
+        point,
+        turf.point([lng + 360, lat]),
+        turf.point([lng - 360, lat]),
+      ];
+    }
+
     function calcDistanceToRange(point, geojson) {
-      // Check if point is inside any polygon
       const features = geojson.type === "FeatureCollection" ? geojson.features : [geojson];
+      const pts = pointVariants(point);
+
+      // Check if point is inside any polygon (trying shifted variants)
       for (const feature of features) {
         if (!feature.geometry) continue;
-        if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
-          if (turf.booleanPointInPolygon(point, feature)) return 0;
+        if (feature.geometry.type !== "Polygon" && feature.geometry.type !== "MultiPolygon") continue;
+        const variants = featureVariants(feature, turf.getCoord(point)[0]);
+        for (const pt of pts) {
+          for (const v of variants) {
+            try { if (turf.booleanPointInPolygon(pt, v)) return 0; } catch { /* skip */ }
+          }
         }
       }
 
@@ -280,16 +348,20 @@
       let minDist = Infinity;
       for (const feature of features) {
         if (!feature.geometry) continue;
-        try {
-          const dist = turf.pointToPolygonDistance(point, feature, { units: "kilometers" });
-          if (dist < minDist) minDist = dist;
-        } catch {
-          // Try as line if polygon distance fails
-          try {
-            const line = turf.polygonToLine(feature);
-            const nearest = turf.nearestPointOnLine(line, point, { units: "kilometers" });
-            if (nearest.properties.dist < minDist) minDist = nearest.properties.dist;
-          } catch { /* skip */ }
+        const variants = featureVariants(feature, turf.getCoord(point)[0]);
+        for (const v of variants) {
+          for (const pt of pts) {
+            try {
+              const dist = turf.pointToPolygonDistance(pt, v, { units: "kilometers" });
+              if (dist < minDist) minDist = dist;
+            } catch {
+              try {
+                const line = turf.polygonToLine(v);
+                const nearest = turf.nearestPointOnLine(line, pt, { units: "kilometers" });
+                if (nearest.properties.dist < minDist) minDist = nearest.properties.dist;
+              } catch { /* skip */ }
+            }
+          }
         }
       }
       return minDist === Infinity ? 0 : minDist;
@@ -297,12 +369,17 @@
 
     function findNearestPointOnRange(point, geojson) {
       const features = geojson.type === "FeatureCollection" ? geojson.features : [geojson];
+      const pts = pointVariants(point);
 
       // If inside, no nearest point needed
       for (const feature of features) {
         if (!feature.geometry) continue;
-        if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
-          if (turf.booleanPointInPolygon(point, feature)) return null;
+        if (feature.geometry.type !== "Polygon" && feature.geometry.type !== "MultiPolygon") continue;
+        const variants = featureVariants(feature, turf.getCoord(point)[0]);
+        for (const pt of pts) {
+          for (const v of variants) {
+            try { if (turf.booleanPointInPolygon(pt, v)) return null; } catch { /* skip */ }
+          }
         }
       }
 
@@ -311,14 +388,23 @@
 
       for (const feature of features) {
         if (!feature.geometry) continue;
-        try {
-          const line = turf.polygonToLine(feature);
-          const nearest = turf.nearestPointOnLine(line, point, { units: "kilometers" });
-          if (nearest.properties.dist < minDist) {
-            minDist = nearest.properties.dist;
-            closestPt = nearest.geometry.coordinates;
+        const variants = featureVariants(feature, turf.getCoord(point)[0]);
+        for (const v of variants) {
+          for (const pt of pts) {
+            try {
+              const line = turf.polygonToLine(v);
+              const nearest = turf.nearestPointOnLine(line, pt, { units: "kilometers" });
+              if (nearest.properties.dist < minDist) {
+                minDist = nearest.properties.dist;
+                // Normalize the nearest point back to [-180, 180]
+                let lon = nearest.geometry.coordinates[0] % 360;
+                if (lon > 180) lon -= 360;
+                if (lon < -180) lon += 360;
+                closestPt = [lon, nearest.geometry.coordinates[1]];
+              }
+            } catch { /* skip */ }
           }
-        } catch { /* skip */ }
+        }
       }
       return closestPt;
     }
