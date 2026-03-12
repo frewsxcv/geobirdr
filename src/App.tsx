@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import L from "leaflet";
+import maplibregl from "maplibre-gl";
 import * as turf from "@turf/turf";
 import type { FeatureCollection } from "geojson";
 import AppBar from "@mui/material/AppBar";
@@ -20,19 +20,28 @@ import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import { calcDistanceToRange, findNearestPointOnRange } from "./geo";
 import type { Bird, DifficultyKey, RoundResult } from "./types";
 
+const LAYER_IDS = {
+  rangeFill: "range-fill",
+  rangeLine: "range-line",
+  distanceLine: "distance-line",
+} as const;
+
+const SOURCE_IDS = {
+  range: "range-source",
+  guess: "guess-source",
+  nearest: "nearest-source",
+  distanceLine: "distance-line-source",
+} as const;
+
 export default function App() {
-  const mapRef = useRef<L.Map | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
   const mapElRef = useRef<HTMLDivElement>(null);
   const allBirdsRef = useRef<Bird[]>([]);
   const birdsRef = useRef<Bird[]>([]);
   const usedBirdsRef = useRef<Set<string>>(new Set());
   const guessAllowedRef = useRef(true);
-  const layersRef = useRef<{
-    guess: L.Marker | null;
-    range: L.GeoJSON | null;
-    line: L.Polyline | null;
-    nearest: L.CircleMarker | null;
-  }>({ guess: null, range: null, line: null, nearest: null });
+  const guessMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const nearestMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   const [currentBird, setCurrentBird] = useState<Bird | null>(null);
   const [roundNum, setRoundNum] = useState(1);
@@ -66,23 +75,23 @@ export default function App() {
 
   const clearLayers = useCallback(() => {
     const map = mapRef.current;
-    const layers = layersRef.current;
     if (!map) return;
-    if (layers.guess) {
-      map.removeLayer(layers.guess);
-      layers.guess = null;
+
+    // Remove layers then sources
+    for (const id of Object.values(LAYER_IDS)) {
+      if (map.getLayer(id)) map.removeLayer(id);
     }
-    if (layers.range) {
-      map.removeLayer(layers.range);
-      layers.range = null;
+    for (const id of Object.values(SOURCE_IDS)) {
+      if (map.getSource(id)) map.removeSource(id);
     }
-    if (layers.line) {
-      map.removeLayer(layers.line);
-      layers.line = null;
+
+    if (guessMarkerRef.current) {
+      guessMarkerRef.current.remove();
+      guessMarkerRef.current = null;
     }
-    if (layers.nearest) {
-      map.removeLayer(layers.nearest);
-      layers.nearest = null;
+    if (nearestMarkerRef.current) {
+      nearestMarkerRef.current.remove();
+      nearestMarkerRef.current = null;
     }
   }, []);
 
@@ -95,7 +104,7 @@ export default function App() {
     const bird = pickRandomBird();
     setCurrentBird(bird);
     setPhoto(null);
-    mapRef.current?.setView([20, 0], 2);
+    mapRef.current?.flyTo({ center: [0, 20], zoom: 1.5, duration: 0 });
 
     fetchBirdPhoto(bird.scientificName).then((p) => {
       if (p) setPhoto(p);
@@ -103,21 +112,20 @@ export default function App() {
   }, [clearLayers, pickRandomBird]);
 
   const handleGuess = useCallback(
-    async (latlng: L.LatLng) => {
+    async (e: maplibregl.MapMouseEvent) => {
       if (!guessAllowedRef.current || !currentBird) return;
       guessAllowedRef.current = false;
 
       const map = mapRef.current!;
-      const layers = layersRef.current;
+      const { lng, lat } = e.lngLat;
 
-      layers.guess = L.marker(latlng, {
-        icon: L.divIcon({
-          className: "",
-          html: '<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
-        }),
-      }).addTo(map);
+      // Place guess marker
+      const guessEl = document.createElement("div");
+      guessEl.style.cssText =
+        "background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);";
+      guessMarkerRef.current = new maplibregl.Marker({ element: guessEl })
+        .setLngLat([lng, lat])
+        .addTo(map);
 
       setLoading(true);
 
@@ -127,49 +135,83 @@ export default function App() {
         );
         setLoading(false);
 
-        layers.range = L.geoJSON(geojson, {
-          style: {
-            color: "#2d6a4f",
-            weight: 2,
-            fillColor: "#40916c",
-            fillOpacity: 0.3,
+        // Add range source and layers
+        map.addSource(SOURCE_IDS.range, { type: "geojson", data: geojson });
+        map.addLayer({
+          id: LAYER_IDS.rangeFill,
+          type: "fill",
+          source: SOURCE_IDS.range,
+          paint: {
+            "fill-color": "#40916c",
+            "fill-opacity": 0.3,
           },
-        }).addTo(map);
+        });
+        map.addLayer({
+          id: LAYER_IDS.rangeLine,
+          type: "line",
+          source: SOURCE_IDS.range,
+          paint: {
+            "line-color": "#2d6a4f",
+            "line-width": 2,
+          },
+        });
 
-        const guessPoint = turf.point([latlng.lng, latlng.lat]);
+        const guessPoint = turf.point([lng, lat]);
         const distanceKm = calcDistanceToRange(guessPoint, geojson);
         const nearest = findNearestPointOnRange(guessPoint, geojson);
 
         if (nearest && distanceKm > 0) {
-          let guessLng = latlng.lng;
+          let guessLng = lng;
           let nearLng = nearest[0];
           if (nearLng - guessLng > 180) nearLng -= 360;
           else if (guessLng - nearLng > 180) nearLng += 360;
 
-          layers.line = L.polyline(
-            [
-              [latlng.lat, guessLng],
-              [nearest[1], nearLng],
-            ],
-            { color: "#e63946", weight: 2, dashArray: "6 4" }
-          ).addTo(map);
+          // Distance line
+          map.addSource(SOURCE_IDS.distanceLine, {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                type: "LineString",
+                coordinates: [
+                  [guessLng, lat],
+                  [nearLng, nearest[1]],
+                ],
+              },
+            },
+          });
+          map.addLayer({
+            id: LAYER_IDS.distanceLine,
+            type: "line",
+            source: SOURCE_IDS.distanceLine,
+            paint: {
+              "line-color": "#e63946",
+              "line-width": 2,
+              "line-dasharray": [3, 2],
+            },
+          });
 
-          layers.nearest = L.circleMarker([nearest[1], nearLng], {
-            radius: 6,
-            color: "#2d6a4f",
-            fillColor: "#40916c",
-            fillOpacity: 1,
-            weight: 2,
-          }).addTo(map);
+          // Nearest point marker
+          const nearEl = document.createElement("div");
+          nearEl.style.cssText =
+            "background:#40916c;width:12px;height:12px;border-radius:50%;border:2px solid #2d6a4f;";
+          nearestMarkerRef.current = new maplibregl.Marker({ element: nearEl })
+            .setLngLat([nearLng, nearest[1]])
+            .addTo(map);
         }
 
         const points = Math.max(0, Math.round(MAX_POINTS - distanceKm));
         setTotalScore((prev) => prev + points);
         setResult({ distanceKm, points });
 
-        const bounds = layers.range.getBounds();
-        bounds.extend(latlng);
-        map.fitBounds(bounds, { padding: [50, 50] });
+        // Fit bounds to show guess and range
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([lng, lat]);
+        turf.coordEach(geojson, (coord) => {
+          bounds.extend(coord as [number, number]);
+        });
+        map.fitBounds(bounds, { padding: 50 });
       } catch (err) {
         setLoading(false);
         console.error("Failed to fetch range:", err);
@@ -187,15 +229,26 @@ export default function App() {
   // Initialize map and load birds
   useEffect(() => {
     if (mapRef.current) return;
-    const map = L.map(mapElRef.current!, { worldCopyJump: true }).setView(
-      [20, 0],
-      2
-    );
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18,
-    }).addTo(map);
+    const map = new maplibregl.Map({
+      container: mapElRef.current!,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          },
+        },
+        layers: [{ id: "osm", type: "raster", source: "osm" }],
+      },
+      center: [0, 20],
+      zoom: 1.5,
+      renderWorldCopies: true,
+    });
+    map.addControl(new maplibregl.NavigationControl(), "top-left");
     mapRef.current = map;
 
     fetchBirds().then((data) => {
@@ -223,7 +276,7 @@ export default function App() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const handler = (e: L.LeafletMouseEvent) => handleGuess(e.latlng);
+    const handler = (e: maplibregl.MapMouseEvent) => handleGuess(e);
     map.on("click", handler);
     return () => {
       map.off("click", handler);
@@ -249,7 +302,7 @@ export default function App() {
     const bird = pickRandomBird();
     setCurrentBird(bird);
     setPhoto(null);
-    mapRef.current?.setView([20, 0], 2);
+    mapRef.current?.flyTo({ center: [0, 20], zoom: 1.5, duration: 0 });
     fetchBirdPhoto(bird.scientificName).then((p) => {
       if (p) setPhoto(p);
     });
@@ -325,7 +378,14 @@ export default function App() {
       </Box>
 
       {/* Map Container */}
-      <Box sx={{ position: "relative", flex: 1, display: "flex", flexDirection: "column" }}>
+      <Box
+        sx={{
+          position: "relative",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <Box ref={mapElRef} sx={{ flex: 1 }} />
 
         {/* Bird Photo */}
@@ -368,7 +428,11 @@ export default function App() {
         {/* Loading Overlay */}
         <Backdrop
           open={loading}
-          sx={{ position: "absolute", zIndex: 999, bgcolor: "rgba(0,0,0,0.3)" }}
+          sx={{
+            position: "absolute",
+            zIndex: 999,
+            bgcolor: "rgba(0,0,0,0.3)",
+          }}
         >
           <Paper sx={{ px: 3.75, py: 2.5, borderRadius: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -428,7 +492,9 @@ export default function App() {
                 </Typography>
               </>
             )}
-            <Typography sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}>
+            <Typography
+              sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}
+            >
               +{result.points.toLocaleString()} points
             </Typography>
             <Button
