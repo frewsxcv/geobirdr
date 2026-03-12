@@ -19,7 +19,18 @@
       z-index: 1000;
     }
     #header h1 { font-size: 1.4rem; letter-spacing: 1px; }
+    #header-right { display: flex; align-items: center; gap: 16px; }
     #score-display { font-size: 1rem; opacity: 0.9; }
+    #difficulty-select {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    #difficulty-select option { color: #333; }
 
     #bird-banner {
       background: #2d6a4f;
@@ -130,7 +141,17 @@
 <body>
   <div id="header">
     <h1>GeoBirdr</h1>
-    <div id="score-display">Round: <span id="round-num">1</span> &nbsp;|&nbsp; Score: <span id="total-score">0</span></div>
+    <div id="header-right">
+      <select id="difficulty-select">
+        <option value="all">All Birds</option>
+        <option value="beginner">Beginner</option>
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+        <option value="expert">Expert</option>
+      </select>
+      <div id="score-display">Round: <span id="round-num">1</span> &nbsp;|&nbsp; Score: <span id="total-score">0</span></div>
+    </div>
   </div>
   <div id="bird-banner">
     <span>Where does the <strong id="bird-name">...</strong> <em id="bird-scientific"></em> live?</span>
@@ -158,6 +179,16 @@
     const TAXA_API = "https://api.inaturalist.org/v1/taxa";
     const MAX_POINTS = 5000;
 
+    const DIFFICULTY = {
+      beginner: { min: 30_000_000, max: Infinity, label: "Beginner" },
+      easy:     { min: 10_000_000, max: 30_000_000, label: "Easy" },
+      medium:   { min: 2_000_000,  max: 10_000_000, label: "Medium" },
+      hard:     { min: 500_000,    max: 2_000_000, label: "Hard" },
+      expert:   { min: 0,          max: 500_000, label: "Expert" },
+      all:      { min: 0,          max: Infinity, label: "All Birds" },
+    };
+
+    let allBirds = [];
     let birds = [];
     let currentBird = null;
     let guessMarker = null;
@@ -167,6 +198,12 @@
     let totalScore = 0;
     let roundNum = 1;
     let guessAllowed = true;
+
+    function filterBirds() {
+      const sel = document.getElementById("difficulty-select").value;
+      const diff = DIFFICULTY[sel];
+      birds = allBirds.filter(b => b.areaKm2 >= diff.min && b.areaKm2 < diff.max);
+    }
 
     // Init map
     const map = L.map("map", { worldCopyJump: true }).setView([20, 0], 2);
@@ -179,9 +216,18 @@
     fetch("birds.json")
       .then(r => r.json())
       .then(data => {
-        birds = data;
+        allBirds = data;
+        filterBirds();
         startRound();
       });
+
+    document.getElementById("difficulty-select").addEventListener("change", () => {
+      filterBirds();
+      totalScore = 0;
+      roundNum = 1;
+      document.getElementById("total-score").textContent = "0";
+      startRound();
+    });
 
     function pickRandomBird() {
       return birds[Math.floor(Math.random() * birds.length)];
