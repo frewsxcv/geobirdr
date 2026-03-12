@@ -9,6 +9,7 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Rating from "@mui/material/Rating";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -40,6 +41,17 @@ const DIFFICULTY_DESCRIPTIONS: Record<DifficultyKey, string> = {
   expert: "Rare birds \u2014 only for the bold",
   all: "Anything goes",
 };
+
+function getStars(score: number): number {
+  if (score >= 45000) return 5;
+  if (score >= 40000) return 4.5;
+  if (score >= 35000) return 4;
+  if (score >= 30000) return 3.5;
+  if (score >= 25000) return 3;
+  if (score >= 20000) return 2.5;
+  if (score >= 15000) return 2;
+  return 1;
+}
 
 function getGrade(score: number): string {
   if (score >= 45000) return "A+";
@@ -627,15 +639,22 @@ export default function App() {
               >
                 out of {(MAX_POINTS * TOTAL_ROUNDS).toLocaleString()} points
               </Typography>
-              <Typography
-                sx={{
-                  fontSize: "2rem",
-                  fontWeight: 700,
-                  mb: 2,
-                }}
-              >
-                Grade: {getGrade(finalScore)}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, mb: 2 }}>
+                <Typography
+                  sx={{
+                    fontSize: "2rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {getGrade(finalScore)}
+                </Typography>
+                <Rating
+                  value={getStars(finalScore)}
+                  precision={0.5}
+                  readOnly
+                  size="large"
+                />
+              </Box>
 
               {/* Round Breakdown */}
               <Typography
