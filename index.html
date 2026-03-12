@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoBirdr</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+
+    #header {
+      background: #1a472a;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1000;
+    }
+    #header h1 { font-size: 1.4rem; letter-spacing: 1px; }
+    #score-display { font-size: 1rem; opacity: 0.9; }
+
+    #bird-banner {
+      background: #2d6a4f;
+      color: white;
+      text-align: center;
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    #bird-banner .instruction {
+      font-size: 0.85rem;
+      opacity: 0.8;
+    }
+
+    #map { flex: 1; }
+
+    #result-panel {
+      display: none;
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+      padding: 20px 28px;
+      z-index: 1000;
+      text-align: center;
+      min-width: 280px;
+    }
+    #result-panel .distance {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #1a472a;
+      margin: 6px 0;
+    }
+    #result-panel .points {
+      font-size: 1.1rem;
+      color: #555;
+      margin-bottom: 14px;
+    }
+    #result-panel .perfect {
+      color: #2d6a4f;
+      font-weight: 600;
+    }
+    #next-btn {
+      background: #2d6a4f;
+      color: white;
+      border: none;
+      padding: 10px 28px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #next-btn:hover { background: #1a472a; }
+
+    #loading-overlay {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+    #loading-overlay .spinner {
+      background: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <h1>GeoBirdr</h1>
+    <div id="score-display">Round: <span id="round-num">1</span> &nbsp;|&nbsp; Score: <span id="total-score">0</span></div>
+  </div>
+  <div id="bird-banner">
+    <span>Where does the <strong id="bird-name">...</strong> live?</span>
+    <span class="instruction">Click on the map to guess</span>
+  </div>
+  <div style="position: relative; flex: 1; display: flex; flex-direction: column;">
+    <div id="map"></div>
+    <div id="loading-overlay"><div class="spinner">Fetching range data...</div></div>
+    <div id="result-panel">
+      <div id="result-text"></div>
+      <div class="distance" id="result-distance"></div>
+      <div class="points" id="result-points"></div>
+      <button id="next-btn">Next Bird</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
+  <script>
+    const RANGE_URL = "https://inaturalist-open-data.s3.us-east-1.amazonaws.com/geomodel/geojsons/latest";
+    const MAX_POINTS = 5000;
+
+    let birds = [];
+    let currentBird = null;
+    let guessMarker = null;
+    let rangeLayer = null;
+    let resultLine = null;
+    let nearestMarker = null;
+    let totalScore = 0;
+    let roundNum = 1;
+    let guessAllowed = true;
+
+    // Init map
+    const map = L.map("map", { worldCopyJump: true }).setView([20, 0], 2);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Load birds
+    fetch("birds.json")
+      .then(r => r.json())
+      .then(data => {
+        birds = data;
+        startRound();
+      });
+
+    function pickRandomBird() {
+      return birds[Math.floor(Math.random() * birds.length)];
+    }
+
+    function clearRound() {
+      if (guessMarker) { map.removeLayer(guessMarker); guessMarker = null; }
+      if (rangeLayer) { map.removeLayer(rangeLayer); rangeLayer = null; }
+      if (resultLine) { map.removeLayer(resultLine); resultLine = null; }
+      if (nearestMarker) { map.removeLayer(nearestMarker); nearestMarker = null; }
+      document.getElementById("result-panel").style.display = "none";
+      document.getElementById("loading-overlay").style.display = "none";
+    }
+
+    function startRound() {
+      clearRound();
+      currentBird = pickRandomBird();
+      document.getElementById("bird-name").textContent = currentBird.name;
+      document.getElementById("round-num").textContent = roundNum;
+      guessAllowed = true;
+      map.setView([20, 0], 2);
+    }
+
+    // Handle guess
+    map.on("click", async (e) => {
+      if (!guessAllowed) return;
+      guessAllowed = false;
+
+      const guessLatLng = e.latlng;
+
+      // Place guess marker
+      guessMarker = L.marker(guessLatLng, {
+        icon: L.divIcon({
+          className: "",
+          html: '<div style="background:#e63946;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        })
+      }).addTo(map);
+
+      // Show loading
+      const overlay = document.getElementById("loading-overlay");
+      overlay.style.display = "flex";
+
+      try {
+        const resp = await fetch(`${RANGE_URL}/${currentBird.taxonId}.geojson`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const geojson = await resp.json();
+
+        overlay.style.display = "none";
+
+        // Show range on map
+        rangeLayer = L.geoJSON(geojson, {
+          style: {
+            color: "#2d6a4f",
+            weight: 2,
+            fillColor: "#40916c",
+            fillOpacity: 0.3,
+          }
+        }).addTo(map);
+
+        // Calculate distance
+        const guessPoint = turf.point([guessLatLng.lng, guessLatLng.lat]);
+        const distanceKm = calcDistanceToRange(guessPoint, geojson);
+
+        // Find nearest point for the line
+        const nearest = findNearestPointOnRange(guessPoint, geojson);
+
+        if (nearest && distanceKm > 0) {
+          // Draw line from guess to nearest range point
+          resultLine = L.polyline(
+            [[guessLatLng.lat, guessLatLng.lng], [nearest[1], nearest[0]]],
+            { color: "#e63946", weight: 2, dashArray: "6 4" }
+          ).addTo(map);
+
+          nearestMarker = L.circleMarker([nearest[1], nearest[0]], {
+            radius: 6, color: "#2d6a4f", fillColor: "#40916c", fillOpacity: 1, weight: 2,
+          }).addTo(map);
+        }
+
+        // Score
+        const points = Math.max(0, Math.round(MAX_POINTS - distanceKm));
+        totalScore += points;
+
+        // Show results
+        const panel = document.getElementById("result-panel");
+        const distEl = document.getElementById("result-distance");
+        const ptsEl = document.getElementById("result-points");
+        const textEl = document.getElementById("result-text");
+
+        if (distanceKm === 0) {
+          textEl.innerHTML = '<span class="perfect">Inside the range!</span>';
+          distEl.textContent = "0 km";
+        } else {
+          textEl.textContent = "Distance to range:";
+          distEl.textContent = `${Math.round(distanceKm).toLocaleString()} km`;
+        }
+        ptsEl.textContent = `+${points.toLocaleString()} points`;
+        document.getElementById("total-score").textContent = totalScore.toLocaleString();
+
+        panel.style.display = "block";
+
+        // Fit map to show both guess and range
+        const bounds = rangeLayer.getBounds();
+        bounds.extend(guessLatLng);
+        map.fitBounds(bounds, { padding: [50, 50] });
+
+      } catch (err) {
+        overlay.style.display = "none";
+        console.error("Failed to fetch range:", err);
+        alert(`Could not load range data for ${currentBird.name}. Skipping...`);
+        guessAllowed = true;
+        roundNum++;
+        startRound();
+      }
+    });
+
+    function calcDistanceToRange(point, geojson) {
+      // Check if point is inside any polygon
+      const features = geojson.type === "FeatureCollection" ? geojson.features : [geojson];
+      for (const feature of features) {
+        if (!feature.geometry) continue;
+        if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
+          if (turf.booleanPointInPolygon(point, feature)) return 0;
+        }
+      }
+
+      // Find minimum distance to any polygon edge
+      let minDist = Infinity;
+      for (const feature of features) {
+        if (!feature.geometry) continue;
+        try {
+          const dist = turf.pointToPolygonDistance(point, feature, { units: "kilometers" });
+          if (dist < minDist) minDist = dist;
+        } catch {
+          // Try as line if polygon distance fails
+          try {
+            const line = turf.polygonToLine(feature);
+            const nearest = turf.nearestPointOnLine(line, point, { units: "kilometers" });
+            if (nearest.properties.dist < minDist) minDist = nearest.properties.dist;
+          } catch { /* skip */ }
+        }
+      }
+      return minDist === Infinity ? 0 : minDist;
+    }
+
+    function findNearestPointOnRange(point, geojson) {
+      const features = geojson.type === "FeatureCollection" ? geojson.features : [geojson];
+
+      // If inside, no nearest point needed
+      for (const feature of features) {
+        if (!feature.geometry) continue;
+        if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
+          if (turf.booleanPointInPolygon(point, feature)) return null;
+        }
+      }
+
+      let minDist = Infinity;
+      let closestPt = null;
+
+      for (const feature of features) {
+        if (!feature.geometry) continue;
+        try {
+          const line = turf.polygonToLine(feature);
+          const nearest = turf.nearestPointOnLine(line, point, { units: "kilometers" });
+          if (nearest.properties.dist < minDist) {
+            minDist = nearest.properties.dist;
+            closestPt = nearest.geometry.coordinates;
+          }
+        } catch { /* skip */ }
+      }
+      return closestPt;
+    }
+
+    // Next button
+    document.getElementById("next-btn").addEventListener("click", () => {
+      roundNum++;
+      startRound();
+    });
+  </script>
+</body>
+</html>

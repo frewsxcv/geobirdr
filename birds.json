@@ -1,0 +1,202 @@
+[
+  {
+    "name": "American Robin",
+    "taxonId": 12727
+  },
+  {
+    "name": "Bald Eagle",
+    "taxonId": 5305
+  },
+  {
+    "name": "Northern Cardinal",
+    "taxonId": 9083
+  },
+  {
+    "name": "Blue Jay",
+    "taxonId": 8229
+  },
+  {
+    "name": "Red-tailed Hawk",
+    "taxonId": 5212
+  },
+  {
+    "name": "Great Blue Heron",
+    "taxonId": 4956
+  },
+  {
+    "name": "American Goldfinch",
+    "taxonId": 145310
+  },
+  {
+    "name": "Downy Woodpecker",
+    "taxonId": 792988
+  },
+  {
+    "name": "Black-capped Chickadee",
+    "taxonId": 144815
+  },
+  {
+    "name": "European Starling",
+    "taxonId": 14850
+  },
+  {
+    "name": "House Sparrow",
+    "taxonId": 13858
+  },
+  {
+    "name": "Mourning Dove",
+    "taxonId": 3454
+  },
+  {
+    "name": "American Crow",
+    "taxonId": 8021
+  },
+  {
+    "name": "Ruby-throated Hummingbird",
+    "taxonId": 6432
+  },
+  {
+    "name": "Barn Swallow",
+    "taxonId": 11901
+  },
+  {
+    "name": "Song Sparrow",
+    "taxonId": 9100
+  },
+  {
+    "name": "Red-winged Blackbird",
+    "taxonId": 9744
+  },
+  {
+    "name": "White-breasted Nuthatch",
+    "taxonId": 14801
+  },
+  {
+    "name": "Cedar Waxwing",
+    "taxonId": 7428
+  },
+  {
+    "name": "Eastern Bluebird",
+    "taxonId": 12942
+  },
+  {
+    "name": "Osprey",
+    "taxonId": 116999
+  },
+  {
+    "name": "Peregrine Falcon",
+    "taxonId": 4647
+  },
+  {
+    "name": "Snowy Owl",
+    "taxonId": 144594
+  },
+  {
+    "name": "Pileated Woodpecker",
+    "taxonId": 17855
+  },
+  {
+    "name": "Common Loon",
+    "taxonId": 4626
+  },
+  {
+    "name": "Atlantic Puffin",
+    "taxonId": 4504
+  },
+  {
+    "name": "Scarlet Tanager",
+    "taxonId": 9921
+  },
+  {
+    "name": "Belted Kingfisher",
+    "taxonId": 2548
+  },
+  {
+    "name": "Great Horned Owl",
+    "taxonId": 20044
+  },
+  {
+    "name": "Wood Duck",
+    "taxonId": 7107
+  },
+  {
+    "name": "Painted Bunting",
+    "taxonId": 10224
+  },
+  {
+    "name": "Roseate Spoonbill",
+    "taxonId": 62529
+  },
+  {
+    "name": "California Condor",
+    "taxonId": 4778
+  },
+  {
+    "name": "Resplendent Quetzal",
+    "taxonId": 20856
+  },
+  {
+    "name": "Superb Fairywren",
+    "taxonId": 12065
+  },
+  {
+    "name": "European Robin",
+    "taxonId": 13094
+  },
+  {
+    "name": "Eurasian Blue Tit",
+    "taxonId": 144849
+  },
+  {
+    "name": "Indian Peafowl",
+    "taxonId": 1204
+  },
+  {
+    "name": "Laughing Kookaburra",
+    "taxonId": 2413
+  },
+  {
+    "name": "Toco Toucan",
+    "taxonId": 18793
+  },
+  {
+    "name": "Andean Condor",
+    "taxonId": 4747
+  },
+  {
+    "name": "Shoebill",
+    "taxonId": 4338
+  },
+  {
+    "name": "Secretary Bird",
+    "taxonId": 117214
+  },
+  {
+    "name": "Mandarin Duck",
+    "taxonId": 7106
+  },
+  {
+    "name": "Common Kingfisher",
+    "taxonId": 2599
+  },
+  {
+    "name": "Golden Eagle",
+    "taxonId": 5074
+  },
+  {
+    "name": "Barn Owl",
+    "taxonId": 1578502
+  },
+  {
+    "name": "Anna's Hummingbird",
+    "taxonId": 6317
+  },
+  {
+    "name": "Greater Roadrunner",
+    "taxonId": 1986
+  },
+  {
+    "name": "Bohemian Waxwing",
+    "taxonId": 7429
+  }
+]
