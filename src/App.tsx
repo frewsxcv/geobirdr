@@ -9,6 +9,8 @@ import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -81,6 +83,7 @@ export default function App() {
   const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
   const [calculating, setCalculating] = useState(false);
   const [birdsLoaded, setBirdsLoaded] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "info" }>({ open: false, message: "", severity: "info" });
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -318,6 +321,11 @@ export default function App() {
         setTotalScore((prev) => prev + points);
         setResult(roundResult);
         setRoundResults((prev) => [...prev, roundResult]);
+        if (distanceKm === 0) {
+          setSnackbar({ open: true, message: `Inside the range! +${points.toLocaleString()} pts`, severity: "success" });
+        } else {
+          setSnackbar({ open: true, message: `${Math.round(distanceKm).toLocaleString()} km away · +${points.toLocaleString()} pts`, severity: "info" });
+        }
         setCalculating(false);
       };
     },
@@ -853,6 +861,21 @@ export default function App() {
           </Paper>
         )}
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
