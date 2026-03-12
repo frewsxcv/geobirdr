@@ -8,6 +8,7 @@ import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
@@ -398,18 +399,7 @@ export default function App() {
           </Typography>
           {gamePhase === "playing" && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Typography
-                variant="body2"
-                sx={{
-                  bgcolor: "rgba(255,255,255,0.15)",
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 1.5,
-                  fontSize: "0.85rem",
-                }}
-              >
-                {DIFFICULTY[difficulty].label}
-              </Typography>
+              <Chip label={DIFFICULTY[difficulty].label} size="small" sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 500 }} />
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
                 Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
                 <AnimatedCounter value={totalScore} />
