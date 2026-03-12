@@ -551,8 +551,7 @@ Bird data from{" "}
                 <a href="https://ebird.org" target="_blank" rel="noopener noreferrer">
                   eBird
                 </a>
-                {" "}&middot;{" "}
-                &copy;{" "}
+                {" "}&middot; Made by{" "}
                 <a href="https://rwell.org" target="_blank" rel="noopener noreferrer">
                   Corey Farwell
                 </a>
