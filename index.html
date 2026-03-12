@@ -105,7 +105,7 @@
     <div id="score-display">Round: <span id="round-num">1</span> &nbsp;|&nbsp; Score: <span id="total-score">0</span></div>
   </div>
   <div id="bird-banner">
-    <span>Where does the <strong id="bird-name">...</strong> live?</span>
+    <span>Where does the <strong id="bird-name">...</strong> <em id="bird-scientific"></em> live?</span>
     <span class="instruction">Click on the map to guess</span>
   </div>
   <div style="position: relative; flex: 1; display: flex; flex-direction: column;">
@@ -167,6 +167,8 @@
       clearRound();
       currentBird = pickRandomBird();
       document.getElementById("bird-name").textContent = currentBird.name;
+      const sciEl = document.getElementById("bird-scientific");
+      sciEl.textContent = currentBird.scientificName ? `(${currentBird.scientificName})` : "";
       document.getElementById("round-num").textContent = roundNum;
       guessAllowed = true;
       map.setView([20, 0], 2);
