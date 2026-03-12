@@ -81,6 +81,34 @@
     }
     #next-btn:hover { background: #1a472a; }
 
+    #bird-photo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      overflow: hidden;
+      width: 160px;
+    }
+    #bird-photo img {
+      width: 160px;
+      height: 160px;
+      object-fit: cover;
+      display: block;
+    }
+    #bird-photo .attribution {
+      font-size: 0.6rem;
+      color: #666;
+      padding: 4px 6px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #bird-photo.hidden { display: none; }
+
     #loading-overlay {
       display: none;
       position: absolute;
@@ -110,6 +138,10 @@
   </div>
   <div style="position: relative; flex: 1; display: flex; flex-direction: column;">
     <div id="map"></div>
+    <div id="bird-photo" class="hidden">
+      <img id="bird-photo-img" src="" alt="">
+      <div class="attribution" id="bird-photo-attr"></div>
+    </div>
     <div id="loading-overlay"><div class="spinner">Fetching range data...</div></div>
     <div id="result-panel">
       <div id="result-text"></div>
@@ -123,6 +155,7 @@
   <script src="https://unpkg.com/@turf/turf@7/turf.min.js"></script>
   <script>
     const RANGE_URL = "https://inaturalist-open-data.s3.us-east-1.amazonaws.com/geomodel/geojsons/latest";
+    const TAXA_API = "https://api.inaturalist.org/v1/taxa";
     const MAX_POINTS = 5000;
 
     let birds = [];
@@ -172,6 +205,30 @@
       document.getElementById("round-num").textContent = roundNum;
       guessAllowed = true;
       map.setView([20, 0], 2);
+      fetchBirdPhoto(currentBird.taxonId);
+    }
+
+    async function fetchBirdPhoto(taxonId) {
+      const photoEl = document.getElementById("bird-photo");
+      const imgEl = document.getElementById("bird-photo-img");
+      const attrEl = document.getElementById("bird-photo-attr");
+      photoEl.classList.add("hidden");
+
+      try {
+        const resp = await fetch(`${TAXA_API}/${taxonId}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const photo = data.results?.[0]?.default_photo;
+        if (!photo) return;
+
+        const url = photo.medium_url || photo.url;
+        if (!url) return;
+
+        imgEl.src = url;
+        imgEl.alt = currentBird.name;
+        attrEl.textContent = photo.attribution_name || photo.attribution || "";
+        photoEl.classList.remove("hidden");
+      } catch { /* photo is non-essential */ }
     }
 
     // Handle guess
