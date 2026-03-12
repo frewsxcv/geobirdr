@@ -6,6 +6,7 @@ export const GCS_BASE = import.meta.env.DEV
 export const RANGES_URL = `${GCS_BASE}/ranges`;
 export const TAXA_API = "https://api.inaturalist.org/v1/taxa";
 export const MAX_POINTS = 5000;
+export const DATA_VERSION = "2";
 
 export const DIFFICULTY: Record<DifficultyKey, DifficultyConfig> = {
   easy: { min: 40_000, max: Infinity, label: "Easy" },

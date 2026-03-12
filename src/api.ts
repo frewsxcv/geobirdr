@@ -1,9 +1,9 @@
-import { GCS_BASE, RANGES_URL, TAXA_API } from "./constants";
+import { DATA_VERSION, GCS_BASE, RANGES_URL, TAXA_API } from "./constants";
 import type { Bird } from "./types";
 import type { FeatureCollection } from "geojson";
 
 export async function fetchBirds(): Promise<Bird[]> {
-  const resp = await fetch(`${GCS_BASE}/birds-ebird.json`);
+  const resp = await fetch(`${GCS_BASE}/birds-ebird.json?v=${DATA_VERSION}`);
   return resp.json();
 }
 

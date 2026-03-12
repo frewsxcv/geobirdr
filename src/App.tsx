@@ -225,8 +225,14 @@ export default function App() {
         .setLngLat([lng, lat])
         .addTo(map);
 
+      // Union multi-feature ranges into a single geometry for display
+      const unioned = turf.union(geojson as FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>);
+      const displayData: FeatureCollection = unioned
+        ? { type: "FeatureCollection", features: [unioned] }
+        : geojson;
+
       // Show range polygon immediately
-      map.addSource(SOURCE_IDS.range, { type: "geojson", data: geojson });
+      map.addSource(SOURCE_IDS.range, { type: "geojson", data: displayData });
       map.addLayer({
         id: LAYER_IDS.rangeFill,
         type: "fill",
