@@ -139,7 +139,9 @@
   <div style="position: relative; flex: 1; display: flex; flex-direction: column;">
     <div id="map"></div>
     <div id="bird-photo" class="hidden">
-      <img id="bird-photo-img" src="" alt="">
+      <a id="bird-photo-link" href="#" target="_blank" rel="noopener">
+        <img id="bird-photo-img" src="" alt="">
+      </a>
       <div class="attribution" id="bird-photo-attr"></div>
     </div>
     <div id="loading-overlay"><div class="spinner">Fetching range data...</div></div>
@@ -226,6 +228,7 @@
 
         imgEl.src = url;
         imgEl.alt = currentBird.name;
+        document.getElementById("bird-photo-link").href = `https://www.inaturalist.org/taxa/${taxonId}`;
         attrEl.textContent = photo.attribution_name || photo.attribution || "";
         photoEl.classList.remove("hidden");
       } catch { /* photo is non-essential */ }
