@@ -21,6 +21,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install fiona shapely pyproj
+      - name: Fetch eBird range data
+        env:
+          EBIRD_ST_KEY: ${{ secrets.EBIRD_ST_KEY }}
+        run: python3 fetch-birds-ebird.py > birds-ebird.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
