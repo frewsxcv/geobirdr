@@ -10,14 +10,14 @@ import MenuItem from "@mui/material/MenuItem";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
-import Backdrop from "@mui/material/Backdrop";
 import CircularProgress from "@mui/material/CircularProgress";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
 import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
-import { calcDistanceToRange, findNearestPointOnRange } from "./geo";
+import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
+import GeoWorker from "./geo.worker?worker";
 import type { Bird, DifficultyKey, RoundResult } from "./types";
 
 const LAYER_IDS = {
@@ -39,16 +39,20 @@ export default function App() {
   const allBirdsRef = useRef<Bird[]>([]);
   const birdsRef = useRef<Bird[]>([]);
   const usedBirdsRef = useRef<Set<string>>(new Set());
-  const guessAllowedRef = useRef(true);
+  const guessAllowedRef = useRef(false);
   const guessMarkerRef = useRef<maplibregl.Marker | null>(null);
   const nearestMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const rangeDataRef = useRef<FeatureCollection | null>(null);
+  const nextBirdRef = useRef<Bird | null>(null);
+  const nextRangePromiseRef = useRef<Promise<FeatureCollection> | null>(null);
 
   const [currentBird, setCurrentBird] = useState<Bird | null>(null);
   const [roundNum, setRoundNum] = useState(1);
   const [totalScore, setTotalScore] = useState(0);
   const [difficulty, setDifficulty] = useState<DifficultyKey>("easy");
-  const [loading, setLoading] = useState(false);
+  const [loadingRange, setLoadingRange] = useState(false);
   const [result, setResult] = useState<RoundResult | null>(null);
+  const [nextReady, setNextReady] = useState(false);
   const [photo, setPhoto] = useState<{
     url: string;
     attribution: string;
@@ -77,7 +81,6 @@ export default function App() {
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove layers then sources
     for (const id of Object.values(LAYER_IDS)) {
       if (map.getLayer(id)) map.removeLayer(id);
     }
@@ -95,11 +98,39 @@ export default function App() {
     }
   }, []);
 
+  const prefetchRange = useCallback(async (bird: Bird) => {
+    setLoadingRange(true);
+    guessAllowedRef.current = false;
+    rangeDataRef.current = null;
+    try {
+      const geojson = await fetchRange(bird.speciesCode);
+      rangeDataRef.current = geojson;
+      guessAllowedRef.current = true;
+    } catch (err) {
+      console.error("Failed to prefetch range:", err);
+    }
+    setLoadingRange(false);
+  }, []);
+
+  // Pre-fetch the next bird's range in the background (called after a guess)
+  const prefetchNextBird = useCallback(() => {
+    const bird = pickRandomBird();
+    nextBirdRef.current = bird;
+    setNextReady(false);
+    const promise = fetchRange(bird.speciesCode);
+    nextRangePromiseRef.current = promise;
+    promise
+      .then(() => setNextReady(true))
+      .catch(() => setNextReady(true)); // allow advancing even on error
+  }, [pickRandomBird]);
+
   const startRound = useCallback(() => {
     clearLayers();
     setResult(null);
-    setLoading(false);
-    guessAllowedRef.current = true;
+    rangeDataRef.current = null;
+    nextBirdRef.current = null;
+    nextRangePromiseRef.current = null;
+    setNextReady(false);
 
     const bird = pickRandomBird();
     setCurrentBird(bird);
@@ -109,15 +140,51 @@ export default function App() {
     fetchBirdPhoto(bird.scientificName).then((p) => {
       if (p) setPhoto(p);
     });
-  }, [clearLayers, pickRandomBird]);
+    prefetchRange(bird);
+  }, [clearLayers, pickRandomBird, prefetchRange]);
+
+  // Advance to the pre-fetched next bird
+  const advanceToNextBird = useCallback(async () => {
+    const bird = nextBirdRef.current;
+    if (!bird) return;
+
+    clearLayers();
+    setResult(null);
+    setNextReady(false);
+    setRoundNum((n) => n + 1);
+    setCurrentBird(bird);
+    setPhoto(null);
+    mapRef.current?.flyTo({ center: [0, 20], zoom: 1.5, duration: 0 });
+
+    fetchBirdPhoto(bird.scientificName).then((p) => {
+      if (p) setPhoto(p);
+    });
+
+    // Use the pre-fetched range data
+    setLoadingRange(true);
+    guessAllowedRef.current = false;
+    rangeDataRef.current = null;
+    try {
+      const geojson = await nextRangePromiseRef.current!;
+      rangeDataRef.current = geojson;
+      guessAllowedRef.current = true;
+    } catch (err) {
+      console.error("Failed to load range:", err);
+    }
+    setLoadingRange(false);
+    nextBirdRef.current = null;
+    nextRangePromiseRef.current = null;
+  }, [clearLayers]);
 
   const handleGuess = useCallback(
-    async (e: maplibregl.MapMouseEvent) => {
-      if (!guessAllowedRef.current || !currentBird) return;
+    (e: maplibregl.MapMouseEvent) => {
+      if (!guessAllowedRef.current || !currentBird || !rangeDataRef.current)
+        return;
       guessAllowedRef.current = false;
 
       const map = mapRef.current!;
       const { lng, lat } = e.lngLat;
+      const geojson = rangeDataRef.current;
 
       // Place guess marker
       const guessEl = document.createElement("div");
@@ -127,38 +194,48 @@ export default function App() {
         .setLngLat([lng, lat])
         .addTo(map);
 
-      setLoading(true);
+      // Show range polygon immediately
+      map.addSource(SOURCE_IDS.range, { type: "geojson", data: geojson });
+      map.addLayer({
+        id: LAYER_IDS.rangeFill,
+        type: "fill",
+        source: SOURCE_IDS.range,
+        paint: {
+          "fill-color": "#40916c",
+          "fill-opacity": 0.3,
+        },
+      });
+      map.addLayer({
+        id: LAYER_IDS.rangeLine,
+        type: "line",
+        source: SOURCE_IDS.range,
+        paint: {
+          "line-color": "#2d6a4f",
+          "line-width": 2,
+        },
+      });
 
-      try {
-        const geojson: FeatureCollection = await fetchRange(
-          currentBird.speciesCode
-        );
-        setLoading(false);
+      // Fit bounds to show guess and range
+      const bounds = new maplibregl.LngLatBounds();
+      bounds.extend([lng, lat]);
+      for (const feature of geojson.features) {
+        if (!feature.geometry || !("coordinates" in feature.geometry)) continue;
+        const bbox = turf.bbox(feature);
+        bounds.extend([bbox[0], bbox[1]]);
+        bounds.extend([bbox[2], bbox[3]]);
+      }
+      map.fitBounds(bounds, { padding: 50 });
 
-        // Add range source and layers
-        map.addSource(SOURCE_IDS.range, { type: "geojson", data: geojson });
-        map.addLayer({
-          id: LAYER_IDS.rangeFill,
-          type: "fill",
-          source: SOURCE_IDS.range,
-          paint: {
-            "fill-color": "#40916c",
-            "fill-opacity": 0.3,
-          },
-        });
-        map.addLayer({
-          id: LAYER_IDS.rangeLine,
-          type: "line",
-          source: SOURCE_IDS.range,
-          paint: {
-            "line-color": "#2d6a4f",
-            "line-width": 2,
-          },
-        });
+      // Start pre-fetching the next bird's range immediately
+      prefetchNextBird();
 
-        const guessPoint = turf.point([lng, lat]);
-        const distanceKm = calcDistanceToRange(guessPoint, geojson);
-        const nearest = findNearestPointOnRange(guessPoint, geojson);
+      // Compute distance off the main thread
+      const worker = new GeoWorker();
+      const request: GeoWorkerRequest = { lng, lat, geojson };
+      worker.postMessage(request);
+      worker.onmessage = (msg: MessageEvent<GeoWorkerResponse>) => {
+        const { distanceKm, nearest } = msg.data;
+        worker.terminate();
 
         if (nearest && distanceKm > 0) {
           let guessLng = lng;
@@ -166,7 +243,6 @@ export default function App() {
           if (nearLng - guessLng > 180) nearLng -= 360;
           else if (guessLng - nearLng > 180) nearLng += 360;
 
-          // Distance line
           map.addSource(SOURCE_IDS.distanceLine, {
             type: "geojson",
             data: {
@@ -192,7 +268,6 @@ export default function App() {
             },
           });
 
-          // Nearest point marker
           const nearEl = document.createElement("div");
           nearEl.style.cssText =
             "background:#40916c;width:12px;height:12px;border-radius:50%;border:2px solid #2d6a4f;";
@@ -204,26 +279,9 @@ export default function App() {
         const points = Math.max(0, Math.round(MAX_POINTS - distanceKm));
         setTotalScore((prev) => prev + points);
         setResult({ distanceKm, points });
-
-        // Fit bounds to show guess and range
-        const bounds = new maplibregl.LngLatBounds();
-        bounds.extend([lng, lat]);
-        turf.coordEach(geojson, (coord) => {
-          bounds.extend(coord as [number, number]);
-        });
-        map.fitBounds(bounds, { padding: 50 });
-      } catch (err) {
-        setLoading(false);
-        console.error("Failed to fetch range:", err);
-        alert(
-          `Could not load range data for ${currentBird.name}. Skipping...`
-        );
-        guessAllowedRef.current = true;
-        setRoundNum((n) => n + 1);
-        startRound();
-      }
+      };
     },
-    [currentBird, startRound]
+    [currentBird, prefetchNextBird]
   );
 
   // Initialize map and load birds
@@ -269,8 +327,9 @@ export default function App() {
       fetchBirdPhoto(bird.scientificName).then((p) => {
         if (p) setPhoto(p);
       });
+      prefetchRange(bird);
     });
-  }, []);
+  }, [prefetchRange]);
 
   // Wire up map click handler
   useEffect(() => {
@@ -283,29 +342,13 @@ export default function App() {
     };
   }, [handleGuess]);
 
-  const handleNextBird = () => {
-    setRoundNum((n) => n + 1);
-    startRound();
-  };
-
   const handleDifficultyChange = (e: SelectChangeEvent) => {
     const key = e.target.value as DifficultyKey;
     setDifficulty(key);
     filterBirds(key);
     setTotalScore(0);
     setRoundNum(1);
-    clearLayers();
-    setResult(null);
-    setLoading(false);
-    guessAllowedRef.current = true;
-
-    const bird = pickRandomBird();
-    setCurrentBird(bird);
-    setPhoto(null);
-    mapRef.current?.flyTo({ center: [0, 20], zoom: 1.5, duration: 0 });
-    fetchBirdPhoto(bird.scientificName).then((p) => {
-      if (p) setPhoto(p);
-    });
+    startRound();
   };
 
   return (
@@ -373,7 +416,7 @@ export default function App() {
           component="span"
           sx={{ fontSize: "0.85rem", opacity: 0.8 }}
         >
-          Click on the map to guess
+          {loadingRange ? "Loading range..." : "Click on the map to guess"}
         </Typography>
       </Box>
 
@@ -424,23 +467,6 @@ export default function App() {
             </Typography>
           </Card>
         )}
-
-        {/* Loading Overlay */}
-        <Backdrop
-          open={loading}
-          sx={{
-            position: "absolute",
-            zIndex: 999,
-            bgcolor: "rgba(0,0,0,0.3)",
-          }}
-        >
-          <Paper sx={{ px: 3.75, py: 2.5, borderRadius: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <CircularProgress size={24} color="secondary" />
-              <Typography variant="body1">Fetching range data...</Typography>
-            </Box>
-          </Paper>
-        </Backdrop>
 
         {/* Result Panel */}
         {result && (
@@ -500,10 +526,16 @@ export default function App() {
             <Button
               variant="contained"
               color="secondary"
-              onClick={handleNextBird}
+              onClick={advanceToNextBird}
+              disabled={!nextReady}
               sx={{ px: 3.5, borderRadius: 2 }}
+              startIcon={
+                !nextReady ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : undefined
+              }
             >
-              Next Bird
+              {!nextReady ? "Loading..." : "Next Bird"}
             </Button>
           </Paper>
         )}
