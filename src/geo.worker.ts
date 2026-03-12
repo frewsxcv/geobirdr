@@ -1,4 +1,4 @@
-import { calcDistanceToRange, findNearestPointOnRange } from "./geo";
+import { unionFeatures, calcRangeResult } from "./geo";
 import * as turf from "@turf/turf";
 import type { FeatureCollection } from "geojson";
 
@@ -16,8 +16,11 @@ export interface GeoWorkerResponse {
 self.onmessage = (e: MessageEvent<GeoWorkerRequest>) => {
   const { lng, lat, geojson } = e.data;
   const point = turf.point([lng, lat]);
-  const distanceKm = calcDistanceToRange(point, geojson);
-  const nearest = findNearestPointOnRange(point, geojson);
-  const response: GeoWorkerResponse = { distanceKm, nearest };
-  self.postMessage(response);
+  const unified = unionFeatures(geojson);
+  if (!unified) {
+    self.postMessage({ distanceKm: 0, nearest: null } satisfies GeoWorkerResponse);
+    return;
+  }
+  const result = calcRangeResult(point, unified);
+  self.postMessage(result satisfies GeoWorkerResponse);
 };

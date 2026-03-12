@@ -13,7 +13,11 @@ export interface DifficultyConfig {
 
 export type DifficultyKey = "easy" | "medium" | "hard" | "expert" | "all";
 
+export type GamePhase = "start" | "playing" | "finished";
+
 export interface RoundResult {
+  birdName: string;
   distanceKm: number;
   points: number;
 }
+

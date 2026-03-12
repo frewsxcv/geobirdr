@@ -5,20 +5,19 @@ import type { FeatureCollection } from "geojson";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
-import Select from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
-import type { SelectChangeEvent } from "@mui/material/Select";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
 import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
 import GeoWorker from "./geo.worker?worker";
-import type { Bird, DifficultyKey, RoundResult } from "./types";
+import type { Bird, DifficultyKey, GamePhase, RoundResult } from "./types";
+
+const TOTAL_ROUNDS = 10;
 
 const LAYER_IDS = {
   rangeFill: "range-fill",
@@ -33,6 +32,25 @@ const SOURCE_IDS = {
   distanceLine: "distance-line-source",
 } as const;
 
+const DIFFICULTY_DESCRIPTIONS: Record<DifficultyKey, string> = {
+  easy: "Large ranges \u2014 great for beginners",
+  medium: "Mid-sized ranges \u2014 a fair challenge",
+  hard: "Small ranges \u2014 for bird enthusiasts",
+  expert: "Tiny ranges \u2014 only for the bold",
+  all: "Anything goes",
+};
+
+function getGrade(score: number): string {
+  if (score >= 45000) return "A+";
+  if (score >= 40000) return "A";
+  if (score >= 35000) return "B+";
+  if (score >= 30000) return "B";
+  if (score >= 25000) return "C+";
+  if (score >= 20000) return "C";
+  if (score >= 15000) return "D";
+  return "F";
+}
+
 export default function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapElRef = useRef<HTMLDivElement>(null);
@@ -45,7 +63,9 @@ export default function App() {
   const rangeDataRef = useRef<FeatureCollection | null>(null);
   const nextBirdRef = useRef<Bird | null>(null);
   const nextRangePromiseRef = useRef<Promise<FeatureCollection> | null>(null);
+  const birdsLoadedRef = useRef(false);
 
+  const [gamePhase, setGamePhase] = useState<GamePhase>("start");
   const [currentBird, setCurrentBird] = useState<Bird | null>(null);
   const [roundNum, setRoundNum] = useState(1);
   const [totalScore, setTotalScore] = useState(0);
@@ -57,6 +77,8 @@ export default function App() {
     url: string;
     attribution: string;
   } | null>(null);
+  const [roundResults, setRoundResults] = useState<RoundResult[]>([]);
+  const [calculating, setCalculating] = useState(false);
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -145,6 +167,12 @@ export default function App() {
 
   // Advance to the pre-fetched next bird
   const advanceToNextBird = useCallback(async () => {
+    // If this was the last round, go to finished
+    if (roundNum >= TOTAL_ROUNDS) {
+      setGamePhase("finished");
+      return;
+    }
+
     const bird = nextBirdRef.current;
     if (!bird) return;
 
@@ -174,10 +202,11 @@ export default function App() {
     setLoadingRange(false);
     nextBirdRef.current = null;
     nextRangePromiseRef.current = null;
-  }, [clearLayers]);
+  }, [clearLayers, roundNum]);
 
   const handleGuess = useCallback(
     (e: maplibregl.MapMouseEvent) => {
+      if (gamePhase !== "playing") return;
       if (!guessAllowedRef.current || !currentBird || !rangeDataRef.current)
         return;
       guessAllowedRef.current = false;
@@ -226,10 +255,16 @@ export default function App() {
       }
       map.fitBounds(bounds, { padding: 50 });
 
-      // Start pre-fetching the next bird's range immediately
-      prefetchNextBird();
+      // Start pre-fetching the next bird's range immediately (if not last round)
+      if (roundNum < TOTAL_ROUNDS) {
+        prefetchNextBird();
+      } else {
+        setNextReady(true);
+      }
 
       // Compute distance off the main thread
+      setCalculating(true);
+      const birdName = currentBird.name;
       const worker = new GeoWorker();
       const request: GeoWorkerRequest = { lng, lat, geojson };
       worker.postMessage(request);
@@ -277,11 +312,14 @@ export default function App() {
         }
 
         const points = Math.max(0, Math.round(MAX_POINTS - distanceKm));
+        const roundResult: RoundResult = { birdName, distanceKm, points };
         setTotalScore((prev) => prev + points);
-        setResult({ distanceKm, points });
+        setResult(roundResult);
+        setRoundResults((prev) => [...prev, roundResult]);
+        setCalculating(false);
       };
     },
-    [currentBird, prefetchNextBird]
+    [currentBird, prefetchNextBird, gamePhase, roundNum]
   );
 
   // Initialize map and load birds
@@ -311,25 +349,9 @@ export default function App() {
 
     fetchBirds().then((data) => {
       allBirdsRef.current = data;
-      const diff = DIFFICULTY["easy"];
-      birdsRef.current = data.filter(
-        (b) => b.areaKm2 >= diff.min && b.areaKm2 < diff.max
-      );
-      const used = usedBirdsRef.current;
-      const birds = birdsRef.current;
-      if (used.size >= birds.length) used.clear();
-      let bird: Bird;
-      do {
-        bird = birds[Math.floor(Math.random() * birds.length)];
-      } while (used.has(bird.speciesCode));
-      used.add(bird.speciesCode);
-      setCurrentBird(bird);
-      fetchBirdPhoto(bird.scientificName).then((p) => {
-        if (p) setPhoto(p);
-      });
-      prefetchRange(bird);
+      birdsLoadedRef.current = true;
     });
-  }, [prefetchRange]);
+  }, []);
 
   // Wire up map click handler
   useEffect(() => {
@@ -342,14 +364,26 @@ export default function App() {
     };
   }, [handleGuess]);
 
-  const handleDifficultyChange = (e: SelectChangeEvent) => {
-    const key = e.target.value as DifficultyKey;
-    setDifficulty(key);
-    filterBirds(key);
+  const handleStartGame = () => {
+    filterBirds(difficulty);
+    usedBirdsRef.current.clear();
     setTotalScore(0);
     setRoundNum(1);
+    setRoundResults([]);
+    setGamePhase("playing");
     startRound();
   };
+
+  const handlePlayAgain = () => {
+    clearLayers();
+    setResult(null);
+    setCurrentBird(null);
+    setPhoto(null);
+    setGamePhase("start");
+  };
+
+  const isLastRound = roundNum >= TOTAL_ROUNDS;
+  const finalScore = roundResults.reduce((sum, r) => sum + r.points, 0);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -359,66 +393,62 @@ export default function App() {
           <Typography variant="h6" sx={{ letterSpacing: 1 }}>
             GeoBirdr
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Select
-              value={difficulty}
-              onChange={handleDifficultyChange}
-              size="small"
-              sx={{
-                color: "white",
-                fontSize: "0.85rem",
-                bgcolor: "rgba(255,255,255,0.15)",
-                border: "1px solid rgba(255,255,255,0.3)",
-                borderRadius: 1.5,
-                "& .MuiSelect-icon": { color: "white" },
-                "& .MuiOutlinedInput-notchedOutline": { border: "none" },
-              }}
-            >
-              <MenuItem value="all">All Birds</MenuItem>
-              <MenuItem value="easy">Easy</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="hard">Hard</MenuItem>
-              <MenuItem value="expert">Expert</MenuItem>
-            </Select>
-            <Typography variant="body1" sx={{ opacity: 0.9 }}>
-              Round: {roundNum} &nbsp;|&nbsp; Score:{" "}
-              {totalScore.toLocaleString()}
-            </Typography>
-          </Box>
+          {gamePhase === "playing" && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.15)",
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 1.5,
+                  fontSize: "0.85rem",
+                }}
+              >
+                {DIFFICULTY[difficulty].label}
+              </Typography>
+              <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
+                {totalScore.toLocaleString()}
+              </Typography>
+            </Box>
+          )}
         </Toolbar>
       </AppBar>
 
-      {/* Bird Banner */}
-      <Box
-        sx={{
-          bgcolor: "secondary.main",
-          color: "white",
-          textAlign: "center",
-          py: 1.25,
-          px: 2.5,
-          fontSize: "1.2rem",
-          zIndex: 1000,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 1.5,
-        }}
-      >
-        <Typography component="span" fontSize="inherit">
-          Where does the{" "}
-          <strong>{currentBird?.name ?? "..."}</strong>{" "}
-          {currentBird?.scientificName && (
-            <em>({currentBird.scientificName})</em>
-          )}{" "}
-          live?
-        </Typography>
-        <Typography
-          component="span"
-          sx={{ fontSize: "0.85rem", opacity: 0.8 }}
+      {/* Bird Banner - only during playing phase */}
+      {gamePhase === "playing" && (
+        <Box
+          sx={{
+            bgcolor: "secondary.main",
+            color: "white",
+            textAlign: "center",
+            py: 1.25,
+            px: 2.5,
+            fontSize: "1.2rem",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 1.5,
+          }}
         >
-          {loadingRange ? "Loading range..." : "Click on the map to guess"}
-        </Typography>
-      </Box>
+          <Typography component="span" fontSize="inherit">
+            Where does the{" "}
+            <strong>{currentBird?.name ?? "..."}</strong>{" "}
+            {currentBird?.scientificName && (
+              <em>({currentBird.scientificName})</em>
+            )}{" "}
+            live?
+          </Typography>
+          <Typography
+            component="span"
+            sx={{ fontSize: "0.85rem", opacity: 0.8 }}
+          >
+            {loadingRange ? "Loading range..." : "Click on the map to guess"}
+          </Typography>
+        </Box>
+      )}
 
       {/* Map Container */}
       <Box
@@ -431,8 +461,213 @@ export default function App() {
       >
         <Box ref={mapElRef} sx={{ flex: 1 }} />
 
+        {/* Start Screen Overlay */}
+        {gamePhase === "start" && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1100,
+              bgcolor: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Paper
+              elevation={8}
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                maxWidth: 520,
+                width: "90%",
+                textAlign: "center",
+              }}
+            >
+              <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+                GeoBirdr
+              </Typography>
+              <Typography sx={{ color: "text.secondary", mb: 3 }}>
+                Guess where birds live! {TOTAL_ROUNDS} rounds, click on the map
+                to place your guess.
+              </Typography>
+
+              <Typography
+                variant="subtitle1"
+                sx={{ fontWeight: 600, mb: 1.5 }}
+              >
+                Choose Difficulty
+              </Typography>
+
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 3 }}>
+                {(
+                  ["easy", "medium", "hard", "expert", "all"] as DifficultyKey[]
+                ).map((key) => (
+                  <Button
+                    key={key}
+                    variant={difficulty === key ? "contained" : "outlined"}
+                    color={difficulty === key ? "primary" : "inherit"}
+                    onClick={() => setDifficulty(key)}
+                    sx={{
+                      justifyContent: "flex-start",
+                      textTransform: "none",
+                      py: 1.25,
+                      px: 2.5,
+                      borderRadius: 2,
+                      border:
+                        difficulty === key
+                          ? undefined
+                          : "1px solid rgba(0,0,0,0.15)",
+                    }}
+                  >
+                    <Box sx={{ textAlign: "left" }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: "0.95rem" }}>
+                        {DIFFICULTY[key].label}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: "0.8rem", opacity: 0.7 }}
+                      >
+                        {DIFFICULTY_DESCRIPTIONS[key]}
+                      </Typography>
+                    </Box>
+                  </Button>
+                ))}
+              </Box>
+
+              <Button
+                variant="contained"
+                color="secondary"
+                size="large"
+                onClick={handleStartGame}
+                sx={{ px: 5, borderRadius: 2, fontWeight: 600 }}
+              >
+                Start Game
+              </Button>
+            </Paper>
+          </Box>
+        )}
+
+        {/* Game Over Overlay */}
+        {gamePhase === "finished" && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1100,
+              bgcolor: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "auto",
+            }}
+          >
+            <Paper
+              elevation={8}
+              sx={{
+                p: 4,
+                borderRadius: 3,
+                maxWidth: 560,
+                width: "90%",
+                textAlign: "center",
+                my: 4,
+              }}
+            >
+              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+                Game Over!
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: "3rem",
+                  fontWeight: 800,
+                  color: "primary.main",
+                  lineHeight: 1.2,
+                }}
+              >
+                {finalScore.toLocaleString()}
+              </Typography>
+              <Typography
+                sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 0.5 }}
+              >
+                out of {(MAX_POINTS * TOTAL_ROUNDS).toLocaleString()} points
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  mb: 2,
+                }}
+              >
+                Grade: {getGrade(finalScore)}
+              </Typography>
+
+              {/* Round Breakdown */}
+              <Typography
+                variant="subtitle1"
+                sx={{ fontWeight: 600, mb: 1 }}
+              >
+                Round Breakdown
+              </Typography>
+              <Box
+                sx={{
+                  maxHeight: 240,
+                  overflow: "auto",
+                  mb: 2.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                {roundResults.map((r, i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      px: 2,
+                      py: 0.75,
+                      borderBottom:
+                        i < roundResults.length - 1
+                          ? "1px solid"
+                          : "none",
+                      borderColor: "divider",
+                      bgcolor: i % 2 === 0 ? "action.hover" : "transparent",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: "0.85rem" }}>
+                      <strong>R{i + 1}</strong>&ensp;{r.birdName}
+                    </Typography>
+                    <Box sx={{ textAlign: "right" }}>
+                      <Typography sx={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                        {r.points.toLocaleString()} pts
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                      >
+                        {r.distanceKm === 0
+                          ? "Inside range"
+                          : `${Math.round(r.distanceKm).toLocaleString()} km`}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+
+              <Button
+                variant="contained"
+                color="secondary"
+                size="large"
+                onClick={handlePlayAgain}
+                sx={{ px: 5, borderRadius: 2, fontWeight: 600 }}
+              >
+                Play Again
+              </Button>
+            </Paper>
+          </Box>
+        )}
+
         {/* Bird Photo */}
-        {photo && (
+        {gamePhase === "playing" && photo && (
           <Card
             sx={{
               position: "absolute",
@@ -468,8 +703,34 @@ export default function App() {
           </Card>
         )}
 
+        {/* Calculating Spinner */}
+        {gamePhase === "playing" && calculating && !result && (
+          <Paper
+            elevation={6}
+            sx={{
+              position: "absolute",
+              bottom: 30,
+              left: "50%",
+              transform: "translateX(-50%)",
+              borderRadius: 3,
+              px: 3.5,
+              py: 2.5,
+              zIndex: 1000,
+              textAlign: "center",
+              minWidth: 200,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1.5,
+            }}
+          >
+            <CircularProgress size={24} />
+            <Typography>Calculating distance...</Typography>
+          </Paper>
+        )}
+
         {/* Result Panel */}
-        {result && (
+        {gamePhase === "playing" && result && (
           <Paper
             elevation={6}
             sx={{
@@ -535,7 +796,11 @@ export default function App() {
                 ) : undefined
               }
             >
-              {!nextReady ? "Loading..." : "Next Bird"}
+              {!nextReady
+                ? "Loading..."
+                : isLastRound
+                  ? "Finish"
+                  : "Next Bird"}
             </Button>
           </Paper>
         )}

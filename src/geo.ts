@@ -4,11 +4,14 @@ import type {
   FeatureCollection,
   GeoJsonProperties,
   Geometry,
+  MultiPolygon,
   Point,
+  Polygon,
   Position,
 } from "geojson";
 
 type AnyFeature = Feature<Geometry, GeoJsonProperties>;
+type PolyFeature = Feature<Polygon | MultiPolygon>;
 
 function shiftCoords(coords: unknown, offset: number): unknown {
   if (typeof (coords as Position)[0] === "number") {
@@ -60,116 +63,85 @@ function pointVariants(point: Feature<Point>): Feature<Point>[] {
   return [point, turf.point([lng + 360, lat]), turf.point([lng - 360, lat])];
 }
 
-export function calcDistanceToRange(
-  point: Feature<Point>,
-  geojson: FeatureCollection
-): number {
-  const features = geojson.features;
-  const pts = pointVariants(point);
-
-  for (const feature of features) {
-    if (!feature.geometry) continue;
-    if (
-      feature.geometry.type !== "Polygon" &&
-      feature.geometry.type !== "MultiPolygon"
-    )
-      continue;
-    const variants = featureVariants(feature);
-    for (const pt of pts) {
-      for (const v of variants) {
-        try {
-          if (turf.booleanPointInPolygon(pt as never, v as never)) return 0;
-        } catch {
-          /* skip */
-        }
-      }
+export function unionFeatures(geojson: FeatureCollection): PolyFeature | null {
+  const polys: PolyFeature[] = [];
+  for (const f of geojson.features) {
+    if (!f.geometry) continue;
+    if (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon") {
+      polys.push(f as PolyFeature);
     }
   }
+  if (polys.length === 0) return null;
+  if (polys.length === 1) return polys[0];
 
-  let minDist = Infinity;
-  for (const feature of features) {
-    if (!feature.geometry) continue;
-    const variants = featureVariants(feature);
-    for (const v of variants) {
-      for (const pt of pts) {
-        try {
-          const dist = turf.pointToPolygonDistance(pt as never, v as never, {
-            units: "kilometers",
-          });
-          if (dist < minDist) minDist = dist;
-        } catch {
-          try {
-            const line = turf.polygonToLine(v as never);
-            const nearest = turf.nearestPointOnLine(
-              line as never,
-              pt as never,
-              { units: "kilometers" }
-            );
-            if (nearest.properties.dist! < minDist)
-              minDist = nearest.properties.dist!;
-          } catch {
-            /* skip */
-          }
-        }
-      }
+  let merged: PolyFeature = polys[0];
+  for (let i = 1; i < polys.length; i++) {
+    try {
+      const result = turf.union(
+        turf.featureCollection([merged, polys[i]])
+      );
+      if (result) merged = result as PolyFeature;
+    } catch {
+      // If union fails (e.g. non-overlapping with topology issues), keep current merged
     }
   }
-  return minDist === Infinity ? 0 : minDist;
+  return merged;
 }
 
-export function findNearestPointOnRange(
+export interface RangeResult {
+  distanceKm: number;
+  nearest: [number, number] | null;
+}
+
+export function calcRangeResult(
   point: Feature<Point>,
-  geojson: FeatureCollection
-): [number, number] | null {
-  const features = geojson.features;
+  unified: PolyFeature
+): RangeResult {
+  const variants = featureVariants(unified);
   const pts = pointVariants(point);
 
-  for (const feature of features) {
-    if (!feature.geometry) continue;
-    if (
-      feature.geometry.type !== "Polygon" &&
-      feature.geometry.type !== "MultiPolygon"
-    )
-      continue;
-    const variants = featureVariants(feature);
-    for (const pt of pts) {
-      for (const v of variants) {
-        try {
-          if (turf.booleanPointInPolygon(pt as never, v as never)) return null;
-        } catch {
-          /* skip */
+  // Check if point is inside range
+  for (const pt of pts) {
+    for (const v of variants) {
+      try {
+        if (turf.booleanPointInPolygon(pt as never, v as never)) {
+          return { distanceKm: 0, nearest: null };
         }
+      } catch {
+        /* skip */
       }
     }
   }
 
+  // Find nearest point and distance in one pass
   let minDist = Infinity;
   let closestPt: [number, number] | null = null;
 
-  for (const feature of features) {
-    if (!feature.geometry) continue;
-    const variants = featureVariants(feature);
-    for (const v of variants) {
-      for (const pt of pts) {
-        try {
-          const line = turf.polygonToLine(v as never);
-          const nearest = turf.nearestPointOnLine(
-            line as never,
-            pt as never,
-            { units: "kilometers" }
-          );
-          if (nearest.properties.dist! < minDist) {
-            minDist = nearest.properties.dist!;
-            let lon = nearest.geometry.coordinates[0] % 360;
-            if (lon > 180) lon -= 360;
-            if (lon < -180) lon += 360;
-            closestPt = [lon, nearest.geometry.coordinates[1]];
-          }
-        } catch {
-          /* skip */
+  for (const v of variants) {
+    for (const pt of pts) {
+      try {
+        const line = turf.polygonToLine(v as never);
+        const nearest = turf.nearestPointOnLine(
+          line as never,
+          pt as never,
+          { units: "kilometers" }
+        );
+        const dist = nearest.properties.dist!;
+        if (dist < minDist) {
+          minDist = dist;
+          let lon = nearest.geometry.coordinates[0] % 360;
+          if (lon > 180) lon -= 360;
+          if (lon < -180) lon += 360;
+          closestPt = [lon, nearest.geometry.coordinates[1]];
         }
+      } catch {
+        /* skip */
       }
     }
   }
-  return closestPt;
+
+  return {
+    distanceKm: minDist === Infinity ? 0 : minDist,
+    nearest: closestPt,
+  };
 }
