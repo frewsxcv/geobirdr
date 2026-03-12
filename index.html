@@ -197,6 +197,7 @@
     let totalScore = 0;
     let roundNum = 1;
     let guessAllowed = true;
+    let usedBirds = new Set();
 
     function filterBirds() {
       const sel = document.getElementById("difficulty-select").value;
@@ -229,7 +230,13 @@
     });
 
     function pickRandomBird() {
-      return birds[Math.floor(Math.random() * birds.length)];
+      if (usedBirds.size >= birds.length) usedBirds.clear();
+      let bird;
+      do {
+        bird = birds[Math.floor(Math.random() * birds.length)];
+      } while (usedBirds.has(bird.speciesCode));
+      usedBirds.add(bird.speciesCode);
+      return bird;
     }
 
     function clearRound() {
