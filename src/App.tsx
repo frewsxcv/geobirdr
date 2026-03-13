@@ -53,16 +53,6 @@ function getStars(score: number): number {
   return 1;
 }
 
-function getGrade(score: number): string {
-  if (score >= 45000) return "A+";
-  if (score >= 40000) return "A";
-  if (score >= 35000) return "B+";
-  if (score >= 30000) return "B";
-  if (score >= 25000) return "C+";
-  if (score >= 20000) return "C";
-  if (score >= 15000) return "D";
-  return "F";
-}
 
 export default function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -639,22 +629,13 @@ export default function App() {
               >
                 out of {(MAX_POINTS * TOTAL_ROUNDS).toLocaleString()} points
               </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1, mb: 2 }}>
-                <Typography
-                  sx={{
-                    fontSize: "2rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {getGrade(finalScore)}
-                </Typography>
-                <Rating
-                  value={getStars(finalScore)}
-                  precision={0.5}
-                  readOnly
-                  size="large"
-                />
-              </Box>
+              <Rating
+                value={getStars(finalScore)}
+                precision={0.5}
+                readOnly
+                size="large"
+                sx={{ mb: 2 }}
+              />
 
               {/* Round Breakdown */}
               <Typography
