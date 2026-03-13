@@ -369,19 +369,7 @@ export default function App() {
     if (mapRef.current) return;
     const map = new maplibregl.Map({
       container: mapElRef.current!,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-          },
-        },
-        layers: [{ id: "osm", type: "raster", source: "osm" }],
-      },
+      style: "https://tiles.versatiles.org/assets/styles/colorful/style.json",
       center: [0, 20],
       zoom: 1.5,
       renderWorldCopies: true,
