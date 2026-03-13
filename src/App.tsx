@@ -28,6 +28,7 @@ import GeoWorker from "./geo.worker?worker";
 import type { Bird, DifficultyKey, GameMode, GamePhase, RoundResult } from "./types";
 import Avatar from "@mui/material/Avatar";
 import AnimatedCounter from "./AnimatedCounter";
+import { playTick, playUrgentTick, playTimeUp, playCountdownBeep, playGoBeep } from "./sounds";
 import {
   getTodayET,
   getDayNumber,
@@ -41,6 +42,7 @@ import {
 } from "./daily";
 
 const FREEPLAY_ROUNDS = 10;
+const ROUND_TIME_SECONDS = 30;
 
 const LAYER_IDS = {
   rangeFill: "range-fill",
@@ -114,6 +116,71 @@ export default function App() {
   const [startTab, setStartTab] = useState<"freeplay" | "daily">("daily");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [shareText, setShareText] = useState("");
+  const [timeLeft, setTimeLeft] = useState(ROUND_TIME_SECONDS);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerActiveRef = useRef(false);
+  const [preCountdown, setPreCountdown] = useState<number | null>(null);
+  const preCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopTimer = useCallback(() => {
+    timerActiveRef.current = false;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const startTimer = useCallback(() => {
+    stopTimer();
+    setTimeLeft(ROUND_TIME_SECONDS);
+    timerActiveRef.current = true;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          // Timer will be stopped and handled by the effect
+          return 0;
+        }
+        if (next <= 3) {
+          playUrgentTick();
+        } else if (next <= 10) {
+          playTick();
+        }
+        return next;
+      });
+    }, 1000);
+  }, [stopTimer]);
+
+  const stopPreCountdown = useCallback(() => {
+    if (preCountdownRef.current) {
+      clearInterval(preCountdownRef.current);
+      preCountdownRef.current = null;
+    }
+    setPreCountdown(null);
+  }, []);
+
+  const startPreCountdown = useCallback(() => {
+    stopPreCountdown();
+    setPreCountdown(3);
+    playCountdownBeep();
+    preCountdownRef.current = setInterval(() => {
+      setPreCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          // Countdown finished — clear interval, enable guessing, start timer
+          if (preCountdownRef.current) {
+            clearInterval(preCountdownRef.current);
+            preCountdownRef.current = null;
+          }
+          playGoBeep();
+          guessAllowedRef.current = true;
+          startTimer();
+          return null;
+        }
+        playCountdownBeep();
+        return prev - 1;
+      });
+    }, 1000);
+  }, [stopPreCountdown, startTimer]);
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -169,12 +236,12 @@ export default function App() {
     try {
       const geojson = await fetchRange(bird.speciesCode);
       rangeDataRef.current = geojson;
-      guessAllowedRef.current = true;
+      startPreCountdown();
     } catch (err) {
       console.error("Failed to prefetch range:", err);
     }
     setLoadingRange(false);
-  }, []);
+  }, [startPreCountdown]);
 
   // Pre-fetch the next bird's range in the background (called after a guess)
   const prefetchNextBird = useCallback(() => {
@@ -238,14 +305,14 @@ export default function App() {
     try {
       const geojson = await nextRangePromiseRef.current!;
       rangeDataRef.current = geojson;
-      guessAllowedRef.current = true;
+      startPreCountdown();
     } catch (err) {
       console.error("Failed to load range:", err);
     }
     setLoadingRange(false);
     nextBirdRef.current = null;
     nextRangePromiseRef.current = null;
-  }, [clearLayers, roundNum]);
+  }, [clearLayers, roundNum, startPreCountdown]);
 
   const handleGuess = useCallback(
     (e: maplibregl.MapMouseEvent) => {
@@ -253,6 +320,7 @@ export default function App() {
       if (!guessAllowedRef.current || !currentBird || !rangeDataRef.current)
         return;
       guessAllowedRef.current = false;
+      stopTimer();
 
       const map = mapRef.current!;
       const { lng, lat } = e.lngLat;
@@ -411,6 +479,61 @@ export default function App() {
     };
   }, [handleGuess]);
 
+  // Handle timer expiry — award 0 points, show the range, and let user advance
+  useEffect(() => {
+    if (timeLeft > 0 || !timerActiveRef.current) return;
+    stopTimer();
+    playTimeUp();
+    guessAllowedRef.current = false;
+
+    const bird = currentBird;
+    if (!bird || !rangeDataRef.current) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    const geojson = rangeDataRef.current;
+
+    // Show range polygon
+    map.addSource(SOURCE_IDS.range, { type: "geojson", data: geojson });
+    map.addLayer({
+      id: LAYER_IDS.rangeFill,
+      type: "fill",
+      source: SOURCE_IDS.range,
+      paint: { "fill-color": "#40916c", "fill-opacity": 0.3 },
+    });
+    map.addLayer({
+      id: LAYER_IDS.rangeLine,
+      type: "line",
+      source: SOURCE_IDS.range,
+      paint: { "line-color": "#2d6a4f", "line-width": 2 },
+    });
+
+    // Fit bounds to show the range
+    const bounds = new maplibregl.LngLatBounds();
+    for (const feature of geojson.features) {
+      if (!feature.geometry || !("coordinates" in feature.geometry)) continue;
+      const bbox = turf.bbox(feature);
+      bounds.extend([bbox[0], bbox[1]]);
+      bounds.extend([bbox[2], bbox[3]]);
+    }
+    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 50 });
+
+    // Pre-fetch next bird
+    if (roundNum < totalRoundsRef.current) {
+      prefetchNextBird();
+    } else {
+      setNextReady(true);
+    }
+
+    // Record 0 points
+    const roundResult: RoundResult = { birdName: bird.name, distanceKm: -1, points: 0 };
+    setResult(roundResult);
+    setRoundResults((prev) => [...prev, roundResult]);
+  }, [timeLeft, currentBird, stopTimer, prefetchNextBird, roundNum]);
+
+  // Cleanup timer on unmount
+  useEffect(() => stopTimer, [stopTimer]);
+
   const handleStartGame = (mode: GameMode = "freeplay") => {
     setGameMode(mode);
     gameModeRef.current = mode;
@@ -435,6 +558,8 @@ export default function App() {
   };
 
   const handlePlayAgain = () => {
+    stopTimer();
+    stopPreCountdown();
     clearLayers();
     setResult(null);
     setCurrentBird(null);
@@ -519,12 +644,34 @@ export default function App() {
             )}{" "}
             live?
           </Typography>
-          <Typography
-            component="span"
-            sx={{ fontSize: { xs: "0.75rem", sm: "0.85rem" }, opacity: 0.8 }}
-          >
-            {loadingRange ? "Loading range..." : "Click on the map to guess"}
-          </Typography>
+          {!result && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography
+                component="span"
+                sx={{ fontSize: { xs: "0.75rem", sm: "0.85rem" }, opacity: 0.8 }}
+              >
+                {loadingRange ? "Loading range..." : preCountdown !== null ? "Get ready..." : "Click on the map to guess"}
+              </Typography>
+              {!loadingRange && !calculating && preCountdown === null && (
+                <Chip
+                  label={timeLeft}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: "0.8rem", sm: "0.9rem" },
+                    minWidth: 36,
+                    bgcolor: timeLeft <= 5 ? "error.main" : timeLeft <= 10 ? "warning.main" : "rgba(255,255,255,0.2)",
+                    color: "white",
+                    animation: timeLeft <= 5 ? "pulse 1s infinite" : "none",
+                    "@keyframes pulse": {
+                      "0%, 100%": { transform: "scale(1)" },
+                      "50%": { transform: "scale(1.15)" },
+                    },
+                  }}
+                />
+              )}
+            </Box>
+          )}
         </Box>
       )}
 
@@ -709,7 +856,7 @@ export default function App() {
                           <Box sx={{ textAlign: "right" }}>
                             <Typography sx={{ fontSize: "0.85rem", fontWeight: 600 }}>{r.points.toLocaleString()} pts</Typography>
                             <Typography sx={{ fontSize: "0.7rem", color: "text.secondary" }}>
-                              {r.distanceKm === 0 ? "Inside range" : `${Math.round(r.distanceKm).toLocaleString()} km`}
+                              {r.distanceKm === -1 ? "Time's up" : r.distanceKm === 0 ? "Inside range" : `${Math.round(r.distanceKm).toLocaleString()} km`}
                             </Typography>
                           </Box>
                         </Box>
@@ -941,6 +1088,40 @@ export default function App() {
           </Box>
         )}
 
+        {/* Pre-round Countdown Overlay */}
+        {gamePhase === "playing" && preCountdown !== null && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1050,
+              bgcolor: "rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "all",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: { xs: "5rem", sm: "8rem" },
+                fontWeight: 800,
+                color: "white",
+                textShadow: "0 4px 20px rgba(0,0,0,0.5)",
+                animation: "countdownPop 0.9s ease-out",
+                "@keyframes countdownPop": {
+                  "0%": { transform: "scale(1.5)", opacity: 0 },
+                  "20%": { transform: "scale(1)", opacity: 1 },
+                  "100%": { transform: "scale(1)", opacity: 1 },
+                },
+              }}
+              key={preCountdown}
+            >
+              {preCountdown}
+            </Typography>
+          </Box>
+        )}
+
         {/* Bird Photo */}
         {gamePhase === "playing" && (
           <Card
@@ -1028,7 +1209,13 @@ export default function App() {
               maxWidth: "90vw",
             }}
           >
-            {result.distanceKm === 0 ? (
+            {result.distanceKm === -1 ? (
+              <Typography
+                sx={{ color: "error.main", fontWeight: 600, fontSize: { xs: "1.1rem", sm: "1.4rem" }, my: { xs: 0.25, sm: 0.75 } }}
+              >
+                Time's up!
+              </Typography>
+            ) : result.distanceKm === 0 ? (
               <>
                 <Typography
                   sx={{ color: "secondary.main", fontWeight: 600, fontSize: { xs: "0.85rem", sm: "1rem" } }}
