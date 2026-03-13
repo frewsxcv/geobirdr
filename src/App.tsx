@@ -11,6 +11,7 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import LinearProgress from "@mui/material/LinearProgress";
+import Rating from "@mui/material/Rating";
 import Skeleton from "@mui/material/Skeleton";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
@@ -47,16 +48,17 @@ const DIFFICULTY_DESCRIPTIONS: Record<DifficultyKey, string> = {
   all: "Anything goes",
 };
 
-function getGrade(score: number): string {
-  if (score >= 45000) return "A+";
-  if (score >= 40000) return "A";
-  if (score >= 35000) return "B+";
-  if (score >= 30000) return "B";
-  if (score >= 25000) return "C+";
-  if (score >= 20000) return "C";
-  if (score >= 15000) return "D";
-  return "F";
+function getStars(score: number): number {
+  if (score >= 45000) return 5;
+  if (score >= 40000) return 4.5;
+  if (score >= 35000) return 4;
+  if (score >= 30000) return 3.5;
+  if (score >= 25000) return 3;
+  if (score >= 20000) return 2.5;
+  if (score >= 15000) return 2;
+  return 1;
 }
+
 
 export default function App() {
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -640,15 +642,12 @@ export default function App() {
               >
                 out of {(MAX_POINTS * TOTAL_ROUNDS).toLocaleString()} points
               </Typography>
-              <Typography
-                sx={{
-                  fontSize: "2rem",
-                  fontWeight: 700,
-                  mb: 1,
-                }}
-              >
-                Grade: {getGrade(finalScore)}
-              </Typography>
+              <Rating
+                value={getStars(finalScore)}
+                precision={0.5}
+                readOnly
+                size="large"
+              />
               <Divider sx={{ my: 2 }} />
 
               {/* Round Breakdown */}
