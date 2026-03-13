@@ -878,8 +878,9 @@ export default function App() {
                 );
               })()}
 
+              <Divider sx={{ mt: 3, mb: 2 }} />
               <Typography
-                sx={{ mt: 3, fontSize: "0.75rem", color: "text.secondary" }}
+                sx={{ fontSize: "0.75rem", color: "text.secondary" }}
               >
                 Made by{" "}
                 <a href="https://rwell.org" target="_blank" rel="noopener noreferrer">
