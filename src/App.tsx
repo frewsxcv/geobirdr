@@ -461,13 +461,12 @@ export default function App() {
             GeoBirdr
           </Typography>
           {gamePhase === "playing" && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1, sm: 2 } }}>
               <Tooltip title={gameMode === "daily" ? "Daily Challenge" : DIFFICULTY_DESCRIPTIONS[difficulty]} arrow>
-                <Chip label={gameMode === "daily" ? `Daily #${getDayNumber(challengeDateRef.current)}` : DIFFICULTY[difficulty].label} size="small" sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 500 }} />
+                <Chip label={gameMode === "daily" ? `Daily #${getDayNumber(challengeDateRef.current)}` : DIFFICULTY[difficulty].label} size="small" sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 500, display: { xs: "none", sm: "flex" } }} />
               </Tooltip>
-              <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                Round {roundNum} / {totalRoundsRef.current} &nbsp;|&nbsp; Score:{" "}
-                <AnimatedCounter value={totalScore} />
+              <Typography variant="body2" sx={{ opacity: 0.9, fontSize: { xs: "0.75rem", sm: "0.875rem" }, whiteSpace: "nowrap" }}>
+                {roundNum}/{totalRoundsRef.current} &nbsp;|&nbsp; <AnimatedCounter value={totalScore} /> pts
               </Typography>
               <Button
                 variant="outlined"
@@ -478,6 +477,8 @@ export default function App() {
                   borderColor: "rgba(255,255,255,0.4)",
                   textTransform: "none",
                   fontSize: "0.8rem",
+                  minWidth: "auto",
+                  px: { xs: 1, sm: 2 },
                   "&:hover": { borderColor: "white", bgcolor: "rgba(255,255,255,0.1)" },
                 }}
               >
@@ -495,14 +496,15 @@ export default function App() {
             bgcolor: "secondary.main",
             color: "white",
             textAlign: "center",
-            py: 1.25,
-            px: 2.5,
-            fontSize: "1.2rem",
+            py: { xs: 0.75, sm: 1.25 },
+            px: { xs: 1.5, sm: 2.5 },
+            fontSize: { xs: "0.95rem", sm: "1.2rem" },
             zIndex: 1000,
             display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
             alignItems: "center",
             justifyContent: "center",
-            gap: 1.5,
+            gap: { xs: 0.25, sm: 1.5 },
           }}
         >
           <Typography component="span" fontSize="inherit">
@@ -515,7 +517,7 @@ export default function App() {
           </Typography>
           <Typography
             component="span"
-            sx={{ fontSize: "0.85rem", opacity: 0.8 }}
+            sx={{ fontSize: { xs: "0.75rem", sm: "0.85rem" }, opacity: 0.8 }}
           >
             {loadingRange ? "Loading range..." : "Click on the map to guess"}
           </Typography>
@@ -776,7 +778,7 @@ export default function App() {
               zIndex: 1100,
               bgcolor: "rgba(0,0,0,0.6)",
               display: "flex",
-              alignItems: "center",
+              alignItems: { xs: "flex-start", sm: "center" },
               justifyContent: "center",
               overflow: "auto",
             }}
@@ -784,7 +786,7 @@ export default function App() {
             <Paper
               elevation={8}
               sx={{
-                p: 4,
+                p: { xs: 2.5, sm: 4 },
                 borderRadius: 3,
                 maxWidth: 560,
                 width: "90%",
@@ -792,12 +794,12 @@ export default function App() {
                 my: 4,
               }}
             >
-              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5, fontSize: { xs: "1.5rem", sm: "2.125rem" } }}>
                 {gameMode === "daily" ? `GeoBirdr Daily #${getDayNumber(challengeDateRef.current)}` : "Game Over!"}
               </Typography>
               <Typography
                 sx={{
-                  fontSize: "3rem",
+                  fontSize: { xs: "2.25rem", sm: "3rem" },
                   fontWeight: 800,
                   color: "primary.main",
                   lineHeight: 1.2,
@@ -923,7 +925,7 @@ export default function App() {
               top: 10,
               right: 10,
               zIndex: 1000,
-              width: 160,
+              width: { xs: 100, sm: 160 },
               borderRadius: 2,
               boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
             }}
@@ -933,10 +935,10 @@ export default function App() {
                 component="img"
                 image={photo.url}
                 alt={currentBird?.name ?? ""}
-                sx={{ width: 160, height: 160, objectFit: "cover" }}
+                sx={{ width: { xs: 100, sm: 160 }, height: { xs: 100, sm: 160 }, objectFit: "cover" }}
               />
             ) : (
-              <Skeleton variant="rectangular" width={160} height={160} animation="wave" />
+              <Skeleton variant="rectangular" sx={{ width: { xs: 100, sm: 160 }, height: { xs: 100, sm: 160 } }} animation="wave" />
             )}
             <Typography
               variant="caption"
