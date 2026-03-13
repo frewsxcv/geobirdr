@@ -113,6 +113,7 @@ export default function App() {
   const [dailyCompleted, setDailyCompleted] = useState(false);
   const [startTab, setStartTab] = useState<"freeplay" | "daily">("daily");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [shareText, setShareText] = useState("");
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -444,8 +445,11 @@ export default function App() {
 
   const handleShare = (dateStr: string, score: number, stars: number, results: RoundResult[]) => {
     const text = generateShareText(dateStr, score, stars, results, MAX_POINTS * totalRoundsRef.current);
+    setShareText(text);
     navigator.clipboard.writeText(text).then(() => {
       setSnackbarOpen(true);
+    }).catch(() => {
+      // clipboard may fail without HTTPS — text is still shown in the textbox
     });
   };
 
@@ -721,6 +725,16 @@ export default function App() {
                     >
                       Share Results
                     </Button>
+                    {shareText && (
+                      <Box
+                        component="textarea"
+                        readOnly
+                        value={shareText}
+                        onClick={(e: React.MouseEvent<HTMLTextAreaElement>) => e.currentTarget.select()}
+                        sx={{ width: "100%", fontFamily: "monospace", fontSize: "0.8rem", p: 1.5, mb: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1, resize: "none", rows: 4, bgcolor: "action.hover" }}
+                        rows={4}
+                      />
+                    )}
 
                     {dailyResult.streak > 0 && (
                       <Typography sx={{ fontWeight: 600, mb: 1 }}>
@@ -897,6 +911,16 @@ export default function App() {
                   >
                     Share Results
                   </Button>
+                  {shareText && (
+                    <Box
+                      component="textarea"
+                      readOnly
+                      value={shareText}
+                      onClick={(e: React.MouseEvent<HTMLTextAreaElement>) => e.currentTarget.select()}
+                      sx={{ width: "100%", fontFamily: "monospace", fontSize: "0.8rem", p: 1.5, mb: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1, resize: "none", bgcolor: "action.hover" }}
+                      rows={4}
+                    />
+                  )}
                   {getDailyStreak() > 0 && (
                     <Typography sx={{ mb: 1.5, fontWeight: 600 }}>
                       Streak: {getDailyStreak()} day{getDailyStreak() !== 1 ? "s" : ""}
