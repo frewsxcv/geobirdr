@@ -369,7 +369,7 @@ export default function App() {
     if (mapRef.current) return;
     const map = new maplibregl.Map({
       container: mapElRef.current!,
-      style: "https://tiles.versatiles.org/assets/styles/colorful/style.json",
+      style: "https://tiles.openfreemap.org/styles/bright",
       center: [0, 20],
       zoom: 1.5,
       renderWorldCopies: true,
