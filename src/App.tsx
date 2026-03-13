@@ -443,8 +443,8 @@ export default function App() {
     setDailyCompleted(isDailyCompleted());
   };
 
-  const handleShare = (dateStr: string, score: number, stars: number, results: RoundResult[]) => {
-    const text = generateShareText(dateStr, score, stars, results, MAX_POINTS * totalRoundsRef.current);
+  const handleShare = (dateStr: string, score: number, results: RoundResult[]) => {
+    const text = generateShareText(dateStr, score, results, MAX_POINTS * totalRoundsRef.current);
     setShareText(text);
     navigator.clipboard.writeText(text).then(() => {
       setSnackbarOpen(true);
@@ -720,7 +720,7 @@ export default function App() {
                       variant="contained"
                       color="secondary"
                       size="large"
-                      onClick={() => handleShare(dailyResult.date, dailyResult.score, dailyResult.stars, dailyResult.roundResults)}
+                      onClick={() => handleShare(dailyResult.date, dailyResult.score, dailyResult.roundResults)}
                       sx={{ px: 5, borderRadius: 2, fontWeight: 600, mb: 1.5 }}
                     >
                       Share Results
@@ -906,7 +906,7 @@ export default function App() {
                     variant="contained"
                     color="secondary"
                     size="large"
-                    onClick={() => handleShare(challengeDateRef.current, finalScore, getStars(finalScore, MAX_POINTS * totalRoundsRef.current), roundResults)}
+                    onClick={() => handleShare(challengeDateRef.current, finalScore, roundResults)}
                     sx={{ px: 5, borderRadius: 2, fontWeight: 600, mb: 1.5 }}
                   >
                     Share Results

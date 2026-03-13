@@ -147,7 +147,7 @@ export function getDailyStreak(): number {
 
 function roundEmoji(points: number): string {
   const pct = points / MAX_POINTS;
-  if (pct >= 1) return "\u{1F7E2}"; // green circle (perfect)
+  if (pct >= 1) return "\u2705"; // white check mark in green box (perfect)
   if (pct >= 0.9) return "\u{1F7E9}"; // green square
   if (pct >= 0.7) return "\u{1F7E8}"; // yellow square
   if (pct >= 0.4) return "\u{1F7E7}"; // orange square
@@ -157,17 +157,15 @@ function roundEmoji(points: number): string {
 export function generateShareText(
   dateStr: string,
   score: number,
-  stars: number,
   roundResults: RoundResult[],
   maxPoints: number,
 ): string {
   const dayNum = getDayNumber(dateStr);
-  const starStr = "\u2B50".repeat(Math.floor(stars));
   const emojiGrid = roundResults.map((r) => roundEmoji(r.points)).join("");
 
   return [
     `GeoBirdr Daily #${dayNum}`,
-    `${score.toLocaleString()} / ${maxPoints.toLocaleString()} ${starStr}`,
+    `${score.toLocaleString()} / ${maxPoints.toLocaleString()}`,
     emojiGrid,
     `https://geobirdr.com/`,
   ].join("\n");
