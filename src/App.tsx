@@ -11,7 +11,6 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Backdrop from "@mui/material/Backdrop";
-import LinearProgress from "@mui/material/LinearProgress";
 import Rating from "@mui/material/Rating";
 import Skeleton from "@mui/material/Skeleton";
 import ToggleButton from "@mui/material/ToggleButton";
@@ -41,7 +40,7 @@ import {
   DAILY_ROUNDS,
 } from "./daily";
 
-const FREEPLAY_ROUNDS = 10;
+const FREEPLAY_ROUNDS = 7;
 const ROUND_TIME_SECONDS = 30;
 
 const LAYER_IDS = {
@@ -673,22 +672,6 @@ export default function App() {
             </Box>
           )}
         </Box>
-      )}
-
-      {/* Round Progress Bar */}
-      {gamePhase === "playing" && (
-        <LinearProgress
-          variant="determinate"
-          value={(roundNum / totalRoundsRef.current) * 100}
-          sx={{
-            height: 4,
-            zIndex: 1000,
-            bgcolor: "rgba(0,0,0,0.1)",
-            "& .MuiLinearProgress-bar": {
-              bgcolor: "grey.500",
-            },
-          }}
-        />
       )}
 
       {/* Map Container */}
