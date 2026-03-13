@@ -20,6 +20,7 @@ export type GameMode = "freeplay" | "daily";
 
 export interface RoundResult {
   birdName: string;
+  speciesCode: string;
   distanceKm: number;
   points: number;
 }

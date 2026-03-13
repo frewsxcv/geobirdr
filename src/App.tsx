@@ -375,6 +375,7 @@ export default function App() {
       // Compute distance off the main thread
       setCalculating(true);
       const birdName = currentBird.name;
+      const birdCode = currentBird.speciesCode;
       const worker = new GeoWorker();
       const request: GeoWorkerRequest = { lng, lat, geojson };
       worker.postMessage(request);
@@ -422,7 +423,7 @@ export default function App() {
         }
 
         const points = Math.max(0, Math.round(MAX_POINTS - distanceKm));
-        const roundResult: RoundResult = { birdName, distanceKm, points };
+        const roundResult: RoundResult = { birdName, speciesCode: birdCode, distanceKm, points };
         setTotalScore((prev) => prev + points);
         setResult(roundResult);
         setRoundResults((prev) => [...prev, roundResult]);
@@ -525,7 +526,7 @@ export default function App() {
     }
 
     // Record 0 points
-    const roundResult: RoundResult = { birdName: bird.name, distanceKm: -1, points: 0 };
+    const roundResult: RoundResult = { birdName: bird.name, speciesCode: bird.speciesCode, distanceKm: -1, points: 0 };
     setResult(roundResult);
     setRoundResults((prev) => [...prev, roundResult]);
   }, [timeLeft, currentBird, stopTimer, prefetchNextBird, roundNum]);
@@ -834,7 +835,7 @@ export default function App() {
                         <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: 2, py: 0.75, borderBottom: i < dailyResult.roundResults.length - 1 ? "1px solid" : "none", borderColor: "divider", bgcolor: i % 2 === 0 ? "action.hover" : "transparent" }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                             <Avatar sx={{ width: 28, height: 28, fontSize: "0.75rem", bgcolor: "primary.main" }}>{i + 1}</Avatar>
-                            <Typography sx={{ fontSize: "0.85rem" }}>{r.birdName}</Typography>
+                            <Typography component="a" href={`https://science.ebird.org/en/status-and-trends/species/${r.speciesCode}/range-map`} target="_blank" rel="noopener noreferrer" sx={{ fontSize: "0.85rem", color: "text.primary", textDecoration: "none", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>{r.birdName}</Typography>
                           </Box>
                           <Box sx={{ textAlign: "right" }}>
                             <Typography sx={{ fontSize: "0.85rem", fontWeight: 600 }}>{r.points.toLocaleString()} pts</Typography>
@@ -1010,7 +1011,13 @@ export default function App() {
                       >
                         {i + 1}
                       </Avatar>
-                      <Typography sx={{ fontSize: "0.85rem" }}>
+                      <Typography
+                        component="a"
+                        href={`https://science.ebird.org/en/status-and-trends/species/${r.speciesCode}/range-map`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ fontSize: "0.85rem", color: "text.primary", textDecoration: "none", "&:hover": { textDecoration: "underline", color: "primary.main" } }}
+                      >
                         {r.birdName}
                       </Typography>
                     </Box>
@@ -1021,7 +1028,7 @@ export default function App() {
                       <Typography
                         sx={{ fontSize: "0.7rem", color: "text.secondary" }}
                       >
-                        {r.distanceKm === 0
+                        {r.distanceKm === -1 ? "Time's up" : r.distanceKm === 0
                           ? "Inside range"
                           : `${Math.round(r.distanceKm).toLocaleString()} km`}
                       </Typography>
