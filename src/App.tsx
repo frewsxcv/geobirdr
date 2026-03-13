@@ -10,6 +10,7 @@ import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
@@ -455,6 +456,22 @@ export default function App() {
             {loadingRange ? "Loading range..." : "Click on the map to guess"}
           </Typography>
         </Box>
+      )}
+
+      {/* Round Progress Bar */}
+      {gamePhase === "playing" && (
+        <LinearProgress
+          variant="determinate"
+          value={(roundNum / 10) * 100}
+          sx={{
+            height: 4,
+            zIndex: 1000,
+            bgcolor: "rgba(0,0,0,0.1)",
+            "& .MuiLinearProgress-bar": {
+              bgcolor: "grey.500",
+            },
+          }}
+        />
       )}
 
       {/* Map Container */}
