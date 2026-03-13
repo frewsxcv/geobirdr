@@ -600,11 +600,11 @@ export default function App() {
                 fullWidth
                 sx={{ mb: 2.5 }}
               >
-                <ToggleButton value="freeplay" sx={{ textTransform: "none", fontWeight: 600, "&.Mui-selected": { bgcolor: "primary.main", color: "white", "&:hover": { bgcolor: "primary.dark" } } }}>
-                  Free Play
-                </ToggleButton>
                 <ToggleButton value="daily" sx={{ textTransform: "none", fontWeight: 600, "&.Mui-selected": { bgcolor: "primary.main", color: "white", "&:hover": { bgcolor: "primary.dark" } } }}>
                   Daily
+                </ToggleButton>
+                <ToggleButton value="freeplay" sx={{ textTransform: "none", fontWeight: 600, "&.Mui-selected": { bgcolor: "primary.main", color: "white", "&:hover": { bgcolor: "primary.dark" } } }}>
+                  Free Play
                 </ToggleButton>
               </ToggleButtonGroup>
 
