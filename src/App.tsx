@@ -478,7 +478,7 @@ export default function App() {
             zIndex: 1000,
             bgcolor: "rgba(0,0,0,0.1)",
             "& .MuiLinearProgress-bar": {
-              bgcolor: "secondary.main",
+              bgcolor: "grey.500",
             },
           }}
         />
