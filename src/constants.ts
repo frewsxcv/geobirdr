@@ -8,6 +8,8 @@ export const TAXA_API = "https://api.inaturalist.org/v1/taxa";
 export const MAX_POINTS = 5000;
 export const DATA_VERSION = "2";
 
+export const DAILY_EPOCH = "2026-03-12";
+
 export const DIFFICULTY: Record<DifficultyKey, DifficultyConfig> = {
   easy: { min: 40_000, max: Infinity, label: "Easy" },
   medium: { min: 10_000, max: 40_000, label: "Medium" },
