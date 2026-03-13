@@ -15,6 +15,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Card from "@mui/material/Card";
 import CardMedia from "@mui/material/CardMedia";
 import Tooltip from "@mui/material/Tooltip";
+import Divider from "@mui/material/Divider";
 import { DIFFICULTY, MAX_POINTS } from "./constants";
 import { fetchBirds, fetchRange, fetchBirdPhoto } from "./api";
 import type { GeoWorkerRequest, GeoWorkerResponse } from "./geo.worker";
@@ -642,11 +643,12 @@ export default function App() {
                 sx={{
                   fontSize: "2rem",
                   fontWeight: 700,
-                  mb: 2,
+                  mb: 1,
                 }}
               >
                 Grade: {getGrade(finalScore)}
               </Typography>
+              <Divider sx={{ my: 2 }} />
 
               {/* Round Breakdown */}
               <Typography
@@ -700,6 +702,7 @@ export default function App() {
                   </Box>
                 ))}
               </Box>
+              <Divider sx={{ my: 2 }} />
 
               <Button
                 variant="contained"
