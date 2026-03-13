@@ -169,6 +169,6 @@ export function generateShareText(
     `GeoBirdr Daily #${dayNum}`,
     `${score.toLocaleString()} / ${maxPoints.toLocaleString()} ${starStr}`,
     emojiGrid,
-    `https://frewsxcv.github.io/geobirdr/`,
+    `https://geobirdr.com/`,
   ].join("\n");
 }
