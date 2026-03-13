@@ -964,21 +964,23 @@ export default function App() {
             ) : (
               <Skeleton variant="rectangular" sx={{ width: { xs: 100, sm: 160 }, height: { xs: 100, sm: 160 } }} animation="wave" />
             )}
-            <Typography
-              variant="caption"
-              sx={{
-                display: "block",
-                px: 0.75,
-                py: 0.5,
-                fontSize: "0.6rem",
-                color: "text.secondary",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {photo ? (result ? <>&copy; {photo.attribution}</> : "") : <Skeleton width="80%" />}
-            </Typography>
+            {(result || !photo) && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block",
+                  px: 0.75,
+                  py: 0.5,
+                  fontSize: "0.6rem",
+                  color: "text.secondary",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {photo ? <>&copy; {photo.attribution}</> : <Skeleton width="80%" />}
+              </Typography>
+            )}
           </Card>
         )}
 
