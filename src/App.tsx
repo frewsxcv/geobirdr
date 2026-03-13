@@ -977,7 +977,7 @@ export default function App() {
                 whiteSpace: "nowrap",
               }}
             >
-              {photo ? <>&copy; {photo.attribution}</> : <Skeleton width="80%" />}
+              {photo ? (result ? <>&copy; {photo.attribution}</> : "") : <Skeleton width="80%" />}
             </Typography>
           </Card>
         )}
