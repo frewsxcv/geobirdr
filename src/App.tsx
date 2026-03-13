@@ -10,6 +10,7 @@ import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
+import Backdrop from "@mui/material/Backdrop";
 import LinearProgress from "@mui/material/LinearProgress";
 import Rating from "@mui/material/Rating";
 import Skeleton from "@mui/material/Skeleton";
@@ -598,6 +599,19 @@ export default function App() {
             </Paper>
           </Box>
         )}
+
+        <Backdrop
+          open={gamePhase === "start" && !birdsLoaded}
+          sx={{
+            zIndex: 1200,
+            color: "#fff",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <CircularProgress color="inherit" />
+          <Typography color="inherit">Loading bird data...</Typography>
+        </Backdrop>
 
         {/* Game Over Overlay */}
         {gamePhase === "finished" && (
