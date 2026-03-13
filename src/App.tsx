@@ -990,12 +990,12 @@ export default function App() {
             elevation={6}
             sx={{
               position: "absolute",
-              bottom: 30,
+              bottom: { xs: 10, sm: 30 },
               left: "50%",
               transform: "translateX(-50%)",
-              borderRadius: 3,
-              px: 3.5,
-              py: 2.5,
+              borderRadius: { xs: 2, sm: 3 },
+              px: { xs: 2, sm: 3.5 },
+              py: { xs: 1.5, sm: 2.5 },
               zIndex: 1000,
               textAlign: "center",
               minWidth: 200,
@@ -1016,30 +1016,31 @@ export default function App() {
             elevation={6}
             sx={{
               position: "absolute",
-              bottom: 30,
+              bottom: { xs: 10, sm: 30 },
               left: "50%",
               transform: "translateX(-50%)",
-              borderRadius: 3,
-              px: 3.5,
-              py: 2.5,
+              borderRadius: { xs: 2, sm: 3 },
+              px: { xs: 2, sm: 3.5 },
+              py: { xs: 1.5, sm: 2.5 },
               zIndex: 1000,
               textAlign: "center",
-              minWidth: 280,
+              minWidth: { xs: 220, sm: 280 },
+              maxWidth: "90vw",
             }}
           >
             {result.distanceKm === 0 ? (
               <>
                 <Typography
-                  sx={{ color: "secondary.main", fontWeight: 600 }}
+                  sx={{ color: "secondary.main", fontWeight: 600, fontSize: { xs: "0.85rem", sm: "1rem" } }}
                 >
                   Inside the range!
                 </Typography>
                 <Typography
                   sx={{
-                    fontSize: "1.8rem",
+                    fontSize: { xs: "1.3rem", sm: "1.8rem" },
                     fontWeight: 700,
                     color: "primary.main",
-                    my: 0.75,
+                    my: { xs: 0.25, sm: 0.75 },
                   }}
                 >
                   0 km
@@ -1047,13 +1048,13 @@ export default function App() {
               </>
             ) : (
               <>
-                <Typography>Distance to range:</Typography>
+                <Typography sx={{ fontSize: { xs: "0.85rem", sm: "1rem" } }}>Distance to range:</Typography>
                 <Typography
                   sx={{
-                    fontSize: "1.8rem",
+                    fontSize: { xs: "1.3rem", sm: "1.8rem" },
                     fontWeight: 700,
                     color: "primary.main",
-                    my: 0.75,
+                    my: { xs: 0.25, sm: 0.75 },
                   }}
                 >
                   {Math.round(result.distanceKm).toLocaleString()} km
@@ -1061,12 +1062,12 @@ export default function App() {
               </>
             )}
             <Typography
-              sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 1.75 }}
+              sx={{ fontSize: { xs: "0.9rem", sm: "1.1rem" }, color: "text.secondary", mb: { xs: 0.75, sm: 1.75 } }}
             >
               <AnimatedCounter value={result.points} prefix="+" suffix=" points" />
             </Typography>
             <Typography
-              sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1.5 }}
+              sx={{ fontSize: { xs: "0.7rem", sm: "0.8rem" }, color: "text.secondary", mb: { xs: 0.75, sm: 1.5 } }}
             >
               <Tooltip title="See this bird's full range map on eBird" arrow>
                 <a
@@ -1083,7 +1084,7 @@ export default function App() {
               color="secondary"
               onClick={advanceToNextBird}
               disabled={!nextReady}
-              sx={{ px: 3.5, borderRadius: 2 }}
+              sx={{ px: { xs: 2.5, sm: 3.5 }, borderRadius: 2, fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
               startIcon={
                 !nextReady ? (
                   <CircularProgress size={18} color="inherit" />
