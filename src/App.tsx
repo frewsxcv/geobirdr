@@ -457,7 +457,7 @@ export default function App() {
   const finalScore = roundResults.reduce((sum, r) => sum + r.points, 0);
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
       {/* Header */}
       <AppBar position="static" sx={{ bgcolor: "primary.main", zIndex: 1000 }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
