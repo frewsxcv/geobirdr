@@ -37,9 +37,10 @@ import {
   isDailyCompleted,
   getDailyStreak,
   generateShareText,
+  DAILY_ROUNDS,
 } from "./daily";
 
-const TOTAL_ROUNDS = 10;
+const FREEPLAY_ROUNDS = 10;
 
 const LAYER_IDS = {
   rangeFill: "range-fill",
@@ -58,18 +59,18 @@ const DIFFICULTY_DESCRIPTIONS: Record<DifficultyKey, string> = {
   easy: "Well-known birds \u2014 great for beginners",
   medium: "Familiar birds \u2014 a fair challenge",
   hard: "Obscure birds \u2014 for bird enthusiasts",
-  expert: "Rare birds \u2014 only for the bold",
   all: "Anything goes",
 };
 
-function getStars(score: number): number {
-  if (score >= 45000) return 5;
-  if (score >= 40000) return 4.5;
-  if (score >= 35000) return 4;
-  if (score >= 30000) return 3.5;
-  if (score >= 25000) return 3;
-  if (score >= 20000) return 2.5;
-  if (score >= 15000) return 2;
+function getStars(score: number, maxScore: number): number {
+  const pct = score / maxScore;
+  if (pct >= 0.9) return 5;
+  if (pct >= 0.8) return 4.5;
+  if (pct >= 0.7) return 4;
+  if (pct >= 0.6) return 3.5;
+  if (pct >= 0.5) return 3;
+  if (pct >= 0.4) return 2.5;
+  if (pct >= 0.3) return 2;
   return 1;
 }
 
@@ -108,8 +109,9 @@ export default function App() {
   const dailyBirdsRef = useRef<Bird[]>([]);
   const roundIndexRef = useRef(0);
   const challengeDateRef = useRef("");
+  const totalRoundsRef = useRef(FREEPLAY_ROUNDS);
   const [dailyCompleted, setDailyCompleted] = useState(false);
-  const [startTab, setStartTab] = useState<"freeplay" | "daily">("freeplay");
+  const [startTab, setStartTab] = useState<"freeplay" | "daily">("daily");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   const filterBirds = useCallback((key: DifficultyKey) => {
@@ -207,7 +209,7 @@ export default function App() {
   // Advance to the pre-fetched next bird
   const advanceToNextBird = useCallback(async () => {
     // If this was the last round, go to finished
-    if (roundNum >= TOTAL_ROUNDS) {
+    if (roundNum >= totalRoundsRef.current) {
       setGamePhase("finished");
       return;
     }
@@ -296,7 +298,7 @@ export default function App() {
       map.fitBounds(bounds, { padding: 50 });
 
       // Start pre-fetching the next bird's range immediately (if not last round)
-      if (roundNum < TOTAL_ROUNDS) {
+      if (roundNum < totalRoundsRef.current) {
         prefetchNextBird();
       } else {
         setNextReady(true);
@@ -403,7 +405,7 @@ export default function App() {
   useEffect(() => {
     if (gamePhase === "finished" && gameModeRef.current === "daily") {
       const score = roundResults.reduce((sum, r) => sum + r.points, 0);
-      const stars = getStars(score);
+      const stars = getStars(score, MAX_POINTS * totalRoundsRef.current);
       saveDailyResult(challengeDateRef.current, score, roundResults, stars);
       setDailyCompleted(true);
     }
@@ -429,8 +431,10 @@ export default function App() {
       challengeDateRef.current = today;
       dailyBirdsRef.current = getDailyBirds(allBirdsRef.current, today);
       roundIndexRef.current = 0;
+      totalRoundsRef.current = DAILY_ROUNDS;
     } else {
       filterBirds(difficulty);
+      totalRoundsRef.current = FREEPLAY_ROUNDS;
     }
 
     usedBirdsRef.current.clear();
@@ -451,13 +455,13 @@ export default function App() {
   };
 
   const handleShare = (dateStr: string, score: number, stars: number, results: RoundResult[]) => {
-    const text = generateShareText(dateStr, score, stars, results, MAX_POINTS * TOTAL_ROUNDS);
+    const text = generateShareText(dateStr, score, stars, results, MAX_POINTS * totalRoundsRef.current);
     navigator.clipboard.writeText(text).then(() => {
       setSnackbarOpen(true);
     });
   };
 
-  const isLastRound = roundNum >= TOTAL_ROUNDS;
+  const isLastRound = roundNum >= totalRoundsRef.current;
   const finalScore = roundResults.reduce((sum, r) => sum + r.points, 0);
 
   return (
@@ -474,7 +478,7 @@ export default function App() {
                 <Chip label={gameMode === "daily" ? `Daily #${getDayNumber(challengeDateRef.current)}` : DIFFICULTY[difficulty].label} size="small" sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "white", fontWeight: 500 }} />
               </Tooltip>
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                Round {roundNum} / {TOTAL_ROUNDS} &nbsp;|&nbsp; Score:{" "}
+                Round {roundNum} / {totalRoundsRef.current} &nbsp;|&nbsp; Score:{" "}
                 <AnimatedCounter value={totalScore} />
               </Typography>
               <Button
@@ -534,7 +538,7 @@ export default function App() {
       {gamePhase === "playing" && (
         <LinearProgress
           variant="determinate"
-          value={(roundNum / 10) * 100}
+          value={(roundNum / totalRoundsRef.current) * 100}
           sx={{
             height: 4,
             zIndex: 1000,
@@ -584,7 +588,7 @@ export default function App() {
                 GeoBirdr
               </Typography>
               <Typography sx={{ color: "text.secondary", mb: 3 }}>
-                Guess where birds live! {TOTAL_ROUNDS} rounds, click on the map
+                Guess where birds live! Click on the map
                 to place your guess.
               </Typography>
 
@@ -622,7 +626,7 @@ export default function App() {
                     sx={{ mb: 3 }}
                   >
                     {(
-                      ["easy", "medium", "hard", "expert", "all"] as DifficultyKey[]
+                      ["easy", "medium", "hard", "all"] as DifficultyKey[]
                     ).map((key) => (
                       <ToggleButton
                         key={key}
@@ -669,7 +673,7 @@ export default function App() {
               {startTab === "daily" && !dailyCompleted && (
                 <>
                   <Typography sx={{ color: "text.secondary", mb: 2 }}>
-                    Same {TOTAL_ROUNDS} birds for everyone. Resets at midnight ET.
+                    Same {DAILY_ROUNDS} birds for everyone. Resets at midnight ET.
                   </Typography>
                   {getDailyStreak() > 0 && (
                     <Typography sx={{ mb: 2, fontWeight: 600 }}>
@@ -697,7 +701,7 @@ export default function App() {
                       {dailyResult.score.toLocaleString()}
                     </Typography>
                     <Typography sx={{ fontSize: "0.95rem", color: "text.secondary", mb: 0.5 }}>
-                      out of {(MAX_POINTS * TOTAL_ROUNDS).toLocaleString()} points
+                      out of {(MAX_POINTS * DAILY_ROUNDS).toLocaleString()} points
                     </Typography>
                     <Rating value={dailyResult.stars} precision={0.5} readOnly size="large" />
 
@@ -816,10 +820,10 @@ export default function App() {
               <Typography
                 sx={{ fontSize: "1.1rem", color: "text.secondary", mb: 0.5 }}
               >
-                out of {(MAX_POINTS * TOTAL_ROUNDS).toLocaleString()} points
+                out of {(MAX_POINTS * totalRoundsRef.current).toLocaleString()} points
               </Typography>
               <Rating
-                value={getStars(finalScore)}
+                value={getStars(finalScore, MAX_POINTS * totalRoundsRef.current)}
                 precision={0.5}
                 readOnly
                 size="large"
@@ -898,7 +902,7 @@ export default function App() {
                     variant="contained"
                     color="secondary"
                     size="large"
-                    onClick={() => handleShare(challengeDateRef.current, finalScore, getStars(finalScore), roundResults)}
+                    onClick={() => handleShare(challengeDateRef.current, finalScore, getStars(finalScore, MAX_POINTS * totalRoundsRef.current), roundResults)}
                     sx={{ px: 5, borderRadius: 2, fontWeight: 600, mb: 1.5 }}
                   >
                     Share Results

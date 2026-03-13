@@ -1,8 +1,8 @@
 import type { Bird, DailyStorage, RoundResult } from "./types";
-import { DAILY_EPOCH, DATA_VERSION, MAX_POINTS } from "./constants";
+import { DAILY_EPOCH, DATA_VERSION, DIFFICULTY, MAX_POINTS } from "./constants";
 
 const STORAGE_KEY = "geobirdr-daily";
-const TOTAL_ROUNDS = 10;
+export const DAILY_ROUNDS = 7;
 
 function mulberry32(seed: number): () => number {
   let s = seed | 0;
@@ -34,21 +34,39 @@ export function getDayNumber(dateStr: string): number {
   return Math.floor((date.getTime() - epoch.getTime()) / 86400000) + 1;
 }
 
-export function getDailyBirds(
-  allBirds: Bird[],
-  dateStr: string,
-  count: number = TOTAL_ROUNDS,
-): Bird[] {
+function pickFromPool(pool: Bird[], count: number, rng: () => number): Bird[] {
+  const available = [...pool];
+  const selected: Bird[] = [];
+  for (let i = 0; i < count && available.length > 0; i++) {
+    const idx = Math.floor(rng() * available.length);
+    selected.push(available[idx]);
+    available.splice(idx, 1);
+  }
+  return selected;
+}
+
+export function getDailyBirds(allBirds: Bird[], dateStr: string): Bird[] {
   const seed = hashString(dateStr + "-v" + DATA_VERSION);
   const rng = mulberry32(seed);
 
-  const pool = [...allBirds];
-  const selected: Bird[] = [];
+  const easy = DIFFICULTY.easy;
+  const medium = DIFFICULTY.medium;
+  const hard = DIFFICULTY.hard;
 
-  for (let i = 0; i < count && pool.length > 0; i++) {
-    const idx = Math.floor(rng() * pool.length);
-    selected.push(pool[idx]);
-    pool.splice(idx, 1);
+  const easyBirds = allBirds.filter((b) => b.observationCount >= easy.min && b.observationCount < easy.max);
+  const mediumBirds = allBirds.filter((b) => b.observationCount >= medium.min && b.observationCount < medium.max);
+  const hardBirds = allBirds.filter((b) => b.observationCount >= hard.min && b.observationCount < hard.max);
+
+  const selected = [
+    ...pickFromPool(easyBirds, 3, rng),
+    ...pickFromPool(mediumBirds, 2, rng),
+    ...pickFromPool(hardBirds, 2, rng),
+  ];
+
+  // Shuffle the combined selection so difficulties are mixed
+  for (let i = selected.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [selected[i], selected[j]] = [selected[j], selected[i]];
   }
 
   return selected;

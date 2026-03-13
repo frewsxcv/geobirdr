@@ -12,7 +12,7 @@ export interface DifficultyConfig {
   label: string;
 }
 
-export type DifficultyKey = "easy" | "medium" | "hard" | "expert" | "all";
+export type DifficultyKey = "easy" | "medium" | "hard" | "all";
 
 export type GamePhase = "start" | "playing" | "finished";
 
