@@ -28,7 +28,7 @@ import GeoWorker from "./geo.worker?worker";
 import type { Bird, DifficultyKey, GameMode, GamePhase, RoundResult } from "./types";
 import Avatar from "@mui/material/Avatar";
 import AnimatedCounter from "./AnimatedCounter";
-import { playTick, playUrgentTick, playTimeUp } from "./sounds";
+import { playTick, playUrgentTick, playTimeUp, playCountdownBeep, playGoBeep } from "./sounds";
 import {
   getTodayET,
   getDayNumber,
@@ -119,6 +119,8 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState(ROUND_TIME_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerActiveRef = useRef(false);
+  const [preCountdown, setPreCountdown] = useState<number | null>(null);
+  const preCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTimer = useCallback(() => {
     timerActiveRef.current = false;
@@ -148,6 +150,37 @@ export default function App() {
       });
     }, 1000);
   }, [stopTimer]);
+
+  const stopPreCountdown = useCallback(() => {
+    if (preCountdownRef.current) {
+      clearInterval(preCountdownRef.current);
+      preCountdownRef.current = null;
+    }
+    setPreCountdown(null);
+  }, []);
+
+  const startPreCountdown = useCallback(() => {
+    stopPreCountdown();
+    setPreCountdown(3);
+    playCountdownBeep();
+    preCountdownRef.current = setInterval(() => {
+      setPreCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          // Countdown finished — clear interval, enable guessing, start timer
+          if (preCountdownRef.current) {
+            clearInterval(preCountdownRef.current);
+            preCountdownRef.current = null;
+          }
+          playGoBeep();
+          guessAllowedRef.current = true;
+          startTimer();
+          return null;
+        }
+        playCountdownBeep();
+        return prev - 1;
+      });
+    }, 1000);
+  }, [stopPreCountdown, startTimer]);
 
   const filterBirds = useCallback((key: DifficultyKey) => {
     const diff = DIFFICULTY[key];
@@ -203,13 +236,12 @@ export default function App() {
     try {
       const geojson = await fetchRange(bird.speciesCode);
       rangeDataRef.current = geojson;
-      guessAllowedRef.current = true;
-      startTimer();
+      startPreCountdown();
     } catch (err) {
       console.error("Failed to prefetch range:", err);
     }
     setLoadingRange(false);
-  }, [startTimer]);
+  }, [startPreCountdown]);
 
   // Pre-fetch the next bird's range in the background (called after a guess)
   const prefetchNextBird = useCallback(() => {
@@ -273,15 +305,14 @@ export default function App() {
     try {
       const geojson = await nextRangePromiseRef.current!;
       rangeDataRef.current = geojson;
-      guessAllowedRef.current = true;
-      startTimer();
+      startPreCountdown();
     } catch (err) {
       console.error("Failed to load range:", err);
     }
     setLoadingRange(false);
     nextBirdRef.current = null;
     nextRangePromiseRef.current = null;
-  }, [clearLayers, roundNum, startTimer]);
+  }, [clearLayers, roundNum, startPreCountdown]);
 
   const handleGuess = useCallback(
     (e: maplibregl.MapMouseEvent) => {
@@ -528,6 +559,7 @@ export default function App() {
 
   const handlePlayAgain = () => {
     stopTimer();
+    stopPreCountdown();
     clearLayers();
     setResult(null);
     setCurrentBird(null);
@@ -618,9 +650,9 @@ export default function App() {
                 component="span"
                 sx={{ fontSize: { xs: "0.75rem", sm: "0.85rem" }, opacity: 0.8 }}
               >
-                {loadingRange ? "Loading range..." : "Click on the map to guess"}
+                {loadingRange ? "Loading range..." : preCountdown !== null ? "Get ready..." : "Click on the map to guess"}
               </Typography>
-              {!loadingRange && !calculating && (
+              {!loadingRange && !calculating && preCountdown === null && (
                 <Chip
                   label={timeLeft}
                   size="small"
@@ -1053,6 +1085,40 @@ export default function App() {
                 {gameMode === "daily" ? "Back to Menu" : "Play Again"}
               </Button>
             </Paper>
+          </Box>
+        )}
+
+        {/* Pre-round Countdown Overlay */}
+        {gamePhase === "playing" && preCountdown !== null && (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1050,
+              bgcolor: "rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "all",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: { xs: "5rem", sm: "8rem" },
+                fontWeight: 800,
+                color: "white",
+                textShadow: "0 4px 20px rgba(0,0,0,0.5)",
+                animation: "countdownPop 0.9s ease-out",
+                "@keyframes countdownPop": {
+                  "0%": { transform: "scale(1.5)", opacity: 0 },
+                  "20%": { transform: "scale(1)", opacity: 1 },
+                  "100%": { transform: "scale(1)", opacity: 1 },
+                },
+              }}
+              key={preCountdown}
+            >
+              {preCountdown}
+            </Typography>
           </Box>
         )}
 
