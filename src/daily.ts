@@ -145,8 +145,9 @@ export function getDailyStreak(): number {
   }
 }
 
-function roundEmoji(points: number): string {
-  const pct = points / MAX_POINTS;
+function roundEmoji(r: RoundResult): string {
+  if (r.distanceKm === -1) return "\u23F0"; // alarm clock (timed out)
+  const pct = r.points / MAX_POINTS;
   if (pct >= 1) return "\u2705"; // white check mark in green box (perfect)
   if (pct >= 0.9) return "\u{1F7E9}"; // green square
   if (pct >= 0.7) return "\u{1F7E8}"; // yellow square
@@ -161,7 +162,7 @@ export function generateShareText(
   maxPoints: number,
 ): string {
   const dayNum = getDayNumber(dateStr);
-  const emojiGrid = roundResults.map((r) => roundEmoji(r.points)).join("");
+  const emojiGrid = roundResults.map((r) => roundEmoji(r)).join("");
 
   return [
     `GeoBirdr Daily #${dayNum}`,
