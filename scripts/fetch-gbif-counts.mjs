@@ -5,24 +5,26 @@ const OUTPUT_PATH = new URL("../birds-gbif-counts.json", import.meta.url);
 const CONCURRENCY = 10;
 const DELAY_MS = 200;
 
-// eBird uses newer taxonomy; GBIF still uses older genus names for these groups.
-const GENUS_SYNONYMS = {
-  Anarhynchus: "Charadrius",
-  Astur: "Accipiter",
-  Botaurus: "Ixobrychus",
-  Chloris: "Carduelis",
-  Daptrius: ["Milvago", "Phalcoboenus"],
-  Driophlox: "Habia",
-  Hesperoburhinus: "Burhinus",
-  Lophospiza: "Accipiter",
-  Neophilydor: "Philydor",
-  Plocealauda: "Mirafra",
-  Quechuavis: "Caprimulgus",
-  Tachyspiza: "Accipiter",
-  Thinornis: "Charadrius",
-};
-
 const birds = JSON.parse(readFileSync(INPUT_PATH, "utf-8"));
+
+// Fetch eBird taxonomy to get family names for each species (keyed by speciesCode)
+console.log("Fetching eBird taxonomy for family lookup...");
+const ebirdTaxRes = await fetch(
+  "https://api.ebird.org/v2/ref/taxonomy/ebird?fmt=json&cat=species",
+  { headers: { "X-eBirdApiToken": "demo" } },
+);
+const ebirdTaxonomy = await ebirdTaxRes.json();
+const familyByCode = {};
+for (const t of ebirdTaxonomy) {
+  if (t.speciesCode && t.familySciName) familyByCode[t.speciesCode] = t.familySciName;
+}
+console.log(`Loaded ${Object.keys(familyByCode).length} family mappings from eBird taxonomy`);
+
+const familyBySpecies = {};
+for (const b of birds) {
+  const family = familyByCode[b.speciesCode];
+  if (family) familyBySpecies[b.scientificName] = family;
+}
 
 // Try to load previous partial results
 let results;
@@ -35,6 +37,20 @@ try {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Cache family name -> GBIF taxonKey
+const familyKeyCache = {};
+
+async function getFamilyKey(familyName) {
+  if (familyKeyCache[familyName]) return familyKeyCache[familyName];
+  const url = `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(familyName)}&rank=FAMILY&kingdom=Animalia`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const key = data.usageKey || null;
+  if (key) familyKeyCache[familyName] = key;
+  return key;
+}
+
 async function matchSpecies(name) {
   const url = `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(name)}&kingdom=Animalia`;
   const res = await fetch(url);
@@ -46,6 +62,39 @@ async function matchSpecies(name) {
   return data.usageKey || null;
 }
 
+async function matchByEpithetAndFamily(scientificName, familyName) {
+  if (!familyName) return null;
+
+  const epithet = scientificName.split(" ").slice(-1)[0];
+  const stem = epithet.replace(/(us|a|um|is|e|ensis|alis|aris)$/, "");
+  const familyKey = await getFamilyKey(familyName);
+  if (!familyKey) return null;
+
+  // GBIF search requires complete words, so try the original epithet plus
+  // common Latin gender variants (e.g. virgata→virgatus, decussata→decussatus)
+  const variants = new Set([epithet]);
+  for (const suffix of ["us", "a", "um", "is", "e", "ensis", "alis", "aris"]) {
+    variants.add(stem + suffix);
+  }
+
+  for (const query of variants) {
+    const url = `https://api.gbif.org/v1/species/search?q=${encodeURIComponent(query)}&highertaxonKey=${familyKey}&rank=SPECIES&limit=10`;
+    const res = await fetch(url);
+    if (!res.ok) continue;
+    const data = await res.json();
+
+    // Find a species whose epithet stem matches
+    for (const r of data.results) {
+      const candEpithet = (r.canonicalName || "").split(" ").slice(-1)[0];
+      const candStem = candEpithet.replace(/(us|a|um|is|e|ensis|alis|aris)$/, "");
+      if (candStem === stem) {
+        return r.acceptedKey || r.nubKey || r.key;
+      }
+    }
+  }
+  return null;
+}
+
 async function getCount(taxonKey) {
   const url = `https://api.gbif.org/v1/occurrence/count?taxonKey=${taxonKey}`;
   const res = await fetch(url);
@@ -54,20 +103,17 @@ async function getCount(taxonKey) {
 }
 
 async function fetchGBIFCount(scientificName) {
-  // Try the name as-is first
+  // Step 1: Try direct name match (works for ~99% of species)
   let taxonKey = await matchSpecies(scientificName);
 
-  // If no match, try synonym genera
+  // Step 2: If no match, search by epithet within the bird's family.
+  // This handles recent genus reclassifications where eBird uses a new genus
+  // name that GBIF hasn't adopted yet (e.g. Tachyspiza→Accipiter).
   if (!taxonKey) {
-    const [genus, ...rest] = scientificName.split(" ");
-    const epithet = rest.join(" ");
-    const synonyms = GENUS_SYNONYMS[genus];
-    if (synonyms) {
-      const candidates = Array.isArray(synonyms) ? synonyms : [synonyms];
-      for (const syn of candidates) {
-        taxonKey = await matchSpecies(`${syn} ${epithet}`);
-        if (taxonKey) break;
-      }
+    const family = familyBySpecies[scientificName];
+    taxonKey = await matchByEpithetAndFamily(scientificName, family);
+    if (taxonKey) {
+      console.log(`  Fallback match: ${scientificName} → taxonKey ${taxonKey}`);
     }
   }
 
