@@ -23,11 +23,14 @@ export async function fetchBirdPhoto(
 ): Promise<BirdPhoto | null> {
   try {
     const resp = await fetch(
-      `${TAXA_API}?q=${encodeURIComponent(scientificName)}&rank=species&per_page=1`
+      `${TAXA_API}?q=${encodeURIComponent(scientificName)}&rank=species&per_page=10`
     );
     if (!resp.ok) return null;
     const data = await resp.json();
-    const photo = data.results?.[0]?.default_photo;
+    const match = data.results?.find(
+      (r: { name?: string }) => r.name === scientificName
+    );
+    const photo = match?.default_photo ?? data.results?.[0]?.default_photo;
     if (!photo) return null;
     const url = photo.medium_url || photo.url;
     if (!url) return null;
